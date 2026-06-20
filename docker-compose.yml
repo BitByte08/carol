@@ -1,16 +1,11 @@
-version: "3.8"
-
 services:
   bot:
-    build: .
+    image: ghcr.io/bitbyte08/maimai-bot:latest
     container_name: maimai-bot
     restart: unless-stopped
     volumes:
       - ./data:/app/data
       - ./config.json:/app/config.json:ro
-    environment:
-      - NODE_ENV=production
-      - DATA_DIR=/app/data
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3456/',r=>{process.exit(r.statusCode===404?0:1)}).on('error',()=>process.exit(1))"]
       interval: 30s
