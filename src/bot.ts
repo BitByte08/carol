@@ -89,7 +89,7 @@ function ratingChar(r: number): string {
   return "⚪";
 }
 
-function sep(label: string, totalW = 30): string {
+function sep(label: string, totalW = 36): string {
   const frame = Math.max(0, totalW - label.length - 2);
   const left = "─".repeat(Math.floor(frame / 2));
   const right = "─".repeat(Math.ceil(frame / 2));
@@ -130,7 +130,7 @@ function songEmbeds(p: NonNullable<ReturnType<typeof getCachedProfile>>, page: n
     const kind = r.musicKind ? ` [${r.musicKind}]` : "";
     const emb = new EmbedBuilder()
       .setColor(0x2b2d31)
-      .setAuthor({ name: sep("#" + idx) })
+      .setAuthor({ name: sep("#" + idx, 34) })
       .setTitle(r.title + kind)
       .setDescription(`\`${r.diff} ${r.level}\``)
       .addFields(
