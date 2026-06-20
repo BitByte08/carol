@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+config.json
+maimai.db
+maimai.db-shm
+maimai.db-wal
+key.pem
+cert.pem
+debug_*.html
+avatar_*.png
+avatar_*.jpg
+nginx/certs/
+data/
+.omo/
