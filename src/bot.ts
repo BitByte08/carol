@@ -1,7 +1,7 @@
 import {
   Client, Events, GatewayIntentBits, SlashCommandBuilder, EmbedBuilder, MessageFlags,
   ChatInputCommandInteraction, REST, Routes,
-  AttachmentBuilder,
+  AttachmentBuilder, PermissionsBitField, GuildMember,
 } from "discord.js";
 import { initEncryption } from "./crypto";
 import { startWebServer, buildBookmarklet, setBaseUrl, getBaseUrl } from "./web";
@@ -22,6 +22,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const commands = [
   new SlashCommandBuilder().setName("프로필").setDescription("내 maimai DX 프로필 보기"),
   new SlashCommandBuilder().setName("북마클릿").setDescription("프로필 동기화용 북마클릿 코드 받기"),
+  new SlashCommandBuilder().setName("역할설정").setDescription("레이팅에 따라 Discord 역할 자동 부여"),
 ].map((c) => c.toJSON());
 
 client.once(Events.ClientReady, async (c) => {
@@ -44,16 +45,33 @@ function buildAvatarAttachment(userId: string): AttachmentBuilder | null {
 }
 
 function ratingColor(r: number): number {
-  if (r >= 15000) return 0x8b00ff;  // 🌈 rainbow
-  if (r >= 14000) return 0xffd700;  // 🟡 gold
-  if (r >= 13000) return 0x8c8c8c;  // ⚪ silver
-  if (r >= 12000) return 0xcd7f32;  // 🟤 bronze
-  if (r >= 10000) return 0xbd5dc7;  // 🟣 purple
-  if (r >= 8000)  return 0xd95656;  // 🔴 red
-  if (r >= 6000)  return 0xf09c3c;  // 🟠 orange
-  if (r >= 4000)  return 0x5fba63;  // 🟢 green
-  if (r >= 2000)  return 0x4d9eea;  // 🔵 blue
-  return 0x95a5a6;                   // ⚪ silver-white
+  if (r >= 15000) return 0x8b00ff;
+  if (r >= 14000) return 0xffd700;
+  if (r >= 13000) return 0x8c8c8c;
+  if (r >= 12000) return 0xcd7f32;
+  if (r >= 10000) return 0xbd5dc7;
+  if (r >= 8000)  return 0xd95656;
+  if (r >= 6000)  return 0xf09c3c;
+  if (r >= 4000)  return 0x5fba63;
+  if (r >= 2000)  return 0x4d9eea;
+  return 0x95a5a6;
+}
+
+const RATING_ROLES: [number, string, number][] = [
+  [15000, "MAIMAI 무지개", 0x8b00ff],
+  [14000, "MAIMAI 금",     0xffd700],
+  [13000, "MAIMAI 은",     0x8c8c8c],
+  [12000, "MAIMAI 동",     0xcd7f32],
+  [10000, "MAIMAI 보라",   0xbd5dc7],
+  [6000,  "MAIMAI 파랑",   0x4d9eea],
+  [2000,  "MAIMAI 청동",   0x95a5a6],
+];
+
+function ratingRoleName(r: number): { name: string; color: number } | null {
+  for (const [min, name, color] of RATING_ROLES) {
+    if (r >= min) return { name, color };
+  }
+  return null;
 }
 
 function sep(label: string, totalW = 36): string {
@@ -118,6 +136,7 @@ function buildProfileReply(cached: NonNullable<ReturnType<typeof getCachedProfil
 
 async function handleCmd(interaction: ChatInputCommandInteraction) {
   const userId = interaction.user.id;
+
   if (interaction.commandName === "프로필") {
     const stored = loadUserSession(userId);
     if (stored?.friendCode) {
@@ -133,6 +152,7 @@ async function handleCmd(interaction: ChatInputCommandInteraction) {
     });
     return;
   }
+
   if (interaction.commandName === "북마클릿") {
     const token = getUserSyncToken(userId);
     await interaction.reply({
@@ -142,6 +162,84 @@ async function handleCmd(interaction: ChatInputCommandInteraction) {
       flags: MessageFlags.Ephemeral,
     });
     return;
+  }
+
+  if (interaction.commandName === "역할설정") {
+    await handleRole(interaction, userId);
+    return;
+  }
+}
+
+async function handleRole(interaction: ChatInputCommandInteraction, userId: string) {
+  if (!interaction.guild) {
+    await interaction.reply({ content: "서버에서만 사용 가능합니다.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const botMember = interaction.guild.members.me;
+  if (!botMember?.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+    await interaction.reply({ content: "봇에 '역할 관리' 권한이 필요합니다.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const stored = loadUserSession(userId);
+  if (!stored?.friendCode) {
+    await interaction.reply({ content: "먼저 `/북마클릿`으로 프로필을 등록해주세요.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const cached = getCachedProfile(stored.friendCode);
+  if (!cached) {
+    await interaction.reply({ content: "프로필 데이터가 없습니다. `/북마클릿`으로 동기화해주세요.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const roleInfo = ratingRoleName(cached.rating);
+  if (!roleInfo) {
+    await interaction.reply({ content: "레이팅이 2000 미만이라 역할이 부여되지 않습니다.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const member = interaction.member as GuildMember;
+  if (!member) {
+    await interaction.reply({ content: "멤버 정보를 불러올 수 없습니다.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  try {
+    const oldRoles = member.roles.cache.filter((r) => r.name.startsWith("MAIMAI "));
+    if (oldRoles.size > 0) await member.roles.remove(oldRoles);
+
+    let targetRole = interaction.guild.roles.cache.find((r) => r.name === roleInfo.name);
+    if (!targetRole) {
+      targetRole = await interaction.guild.roles.create({
+        name: roleInfo.name,
+        color: roleInfo.color,
+        reason: "maimai 레이팅 자동 역할",
+      });
+    }
+
+    if (targetRole.position >= botMember.roles.highest.position) {
+      await interaction.reply({
+        content: `"${roleInfo.name}" 역할이 봇보다 높거나 같아서 부여할 수 없습니다. 관리자가 역할 순서를 조정해주세요.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    const allTierRoles = interaction.guild.roles.cache.filter((r) =>
+      RATING_ROLES.some(([, name]) => r.name === name)
+    );
+    await member.roles.remove(allTierRoles);
+    await member.roles.add(targetRole);
+
+    await interaction.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(roleInfo.color)
+        .setDescription(`레이팅 **${cached.rating}** → **${roleInfo.name}** 역할 부여 완료!`)],
+      flags: MessageFlags.Ephemeral,
+    });
+  } catch (e: any) {
+    console.error("[role]", e);
+    await interaction.reply({
+      content: `역할 부여 실패: ${e.message || "알 수 없는 오류"}`,
+      flags: MessageFlags.Ephemeral,
+    });
   }
 }
 
