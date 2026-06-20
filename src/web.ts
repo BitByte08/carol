@@ -5,11 +5,27 @@ import { cacheProfile, saveUserSession, getUserSyncToken, findUserBySyncToken, s
 
 let baseUrl = "";
 export function setBaseUrl(url: string): void { baseUrl = url; }
+export function getBaseUrl(port: number): string { return baseUrl || `http://localhost:${port}`; }
 
 export function buildBookmarklet(token: string, port: number): string {
-  const server = baseUrl || `http://localhost:${port}`;
-  return `javascript:(async()=>{const c='${token}';const s='${server}';const[h,p,r,f]=await Promise.all([fetch('/maimai-mobile/home/'),fetch('/maimai-mobile/playerData/'),fetch('/maimai-mobile/record/'),fetch('/maimai-mobile/friend/userFriendCode/')].map(x=>x.then(v=>v.text())));let a='';try{const m=h.match(/src="(https:\\/\\/[^"]*\\/Icon\\/[^"]+)"/);if(m){const b=await fetch(m[1]).then(v=>v.blob());a=await new Promise(v=>{const g=new FileReader();g.onload=()=>v(g.result);g.readAsDataURL(b)})}}catch(e){}await fetch(s+'/sync?code='+c,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({h,p,r,f,a})});alert('\\uc644\\ub8cc!')})()`;
+  const server = getBaseUrl(port);
+  return `javascript:(function(d){var s=d.createElement('script');s.src='${server}/bookmarklet.js?code=${token}&v='+Math.floor(Date.now()/1e5);d.body.append(s)})(document)`;
 }
+
+const bookmarkletJs = `(async()=>{
+var e=document,s=e.currentScript.src,u=new URL(s),c=u.searchParams.get('code')||'',v=u.origin;
+var x=function(a){return fetch(a).then(function(r){return r.text()})};
+var q=['/maimai-mobile/home/','/maimai-mobile/playerData/','/maimai-mobile/record/','/maimai-mobile/friend/userFriendCode/'];
+var r=await Promise.all(q.map(x));
+var h=r[0],p=r[1],rd=r[2],f=r[3],a='';
+try{
+  var m=h.match(/src="(https:\\\\/\\\\/[^"]*\\\\/Icon\\\\/[^"]+)"/);
+  if(m){var b=await fetch(m[1]).then(function(t){return t.blob()});
+  a=await new Promise(function(d){var g=new FileReader();g.onload=function(){d(g.result)};g.readAsDataURL(b)})}
+}catch(e){}
+await fetch(v+'/sync?code='+c,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({h:h,p:p,r:rd,f:f,a:a})});
+alert('\\uC644\\uB8CC!')
+})()`;
 
 function guidePage(token: string, bookmarklet: string): string {
   return `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -56,6 +72,12 @@ export function startWebServer(port: number): void {
       } else {
         res.writeHead(404); res.end();
       }
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/bookmarklet.js") {
+      res.writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache" });
+      res.end(bookmarkletJs);
       return;
     }
 
