@@ -139,7 +139,7 @@ function songEmbeds(p: NonNullable<ReturnType<typeof getCachedProfile>>, view: s
     const emb = new EmbedBuilder()
       .setColor(0x2b2d31)
       .setAuthor({ name: sep(`#${idx}`) })
-      .setTitle(sep(r.title, 18))
+      .setTitle(sep(r.title, 22))
       .setDescription(descParts.join(" · "))
       .addFields(
         { name: "달성률", value: r.achievement, inline: true },
