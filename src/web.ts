@@ -105,6 +105,64 @@ export function startWebServer(port: number): void {
       return;
     }
 
+    if (req.method === "GET" && url.pathname === "/privacy") {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(`<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>개인정보처리방침 - maimaiDISCORD</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#0d0d0d;color:#ccc;max-width:720px;margin:40px auto;padding:24px;line-height:1.7}
+h1{color:#fff;border-bottom:1px solid #333;padding-bottom:12px;margin-bottom:24px}
+h2{color:#ddd;margin:28px 0 12px}
+p{margin:8px 0}
+a{color:#4caf50}
+</style></head><body>
+<h1>개인정보처리방침</h1>
+<p>최종 수정일: 2026년 6월</p>
+<h2>1. 수집하는 정보</h2>
+<p>본 봇은 Discord 사용자 ID, maimai DX net 프로필 데이터(플레이어명, 레이팅, 칭호, 클래스, 아바타 이미지, 최근 플레이 기록, 재킷 이미지)를 수집합니다.</p>
+<h2>2. 수집 방법</h2>
+<p>사용자가 브라우저에서 북마클릿을 실행하여 maimai DX net에서 직접 데이터를 서버로 전송합니다. SEGA ID, 비밀번호 등 계정 정보는 절대 수집하지 않습니다.</p>
+<h2>3. 데이터 저장</h2>
+<p>모든 데이터는 서버 내 SQLite 데이터베이스에 암호화하여 저장됩니다. 아바타 및 재킷 이미지는 base64 인코딩되어 저장됩니다.</p>
+<h2>4. 데이터 사용 목적</h2>
+<p>Discord에서 maimai DX 프로필을 표시하는 용도로만 사용됩니다.</p>
+<h2>5. 제3자 제공</h2>
+<p>수집된 데이터를 제3자에게 제공하지 않습니다.</p>
+<h2>6. 데이터 삭제</h2>
+<p>/프로필 데이터는 북마클릿 재실행 시 덮어쓰기됩니다. 완전한 삭제를 원하시면 봇 관리자에게 요청해 주세요.</p>
+</body></html>`);
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/terms") {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(`<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>이용약관 - maimaiDISCORD</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#0d0d0d;color:#ccc;max-width:720px;margin:40px auto;padding:24px;line-height:1.7}
+h1{color:#fff;border-bottom:1px solid #333;padding-bottom:12px;margin-bottom:24px}
+h2{color:#ddd;margin:28px 0 12px}
+p{margin:8px 0}
+a{color:#4caf50}
+</style></head><body>
+<h1>이용약관</h1>
+<p>최종 수정일: 2026년 6월</p>
+<h2>1. 서비스 설명</h2>
+<p>maimaiDISCORD는 Discord에서 SEGA의 아케이드 리듬 게임 「maimai DX」의 공식 웹사이트(maimai DX net) 프로필을 조회할 수 있는 비공식 팬 메이드 봇입니다.</p>
+<h2>2. 저작권</h2>
+<p>본 서비스는 SEGA와 공식적으로 제휴, 후원 또는 승인되지 않았습니다. maimai DX, maimai DX net 및 관련된 모든 게임 자산, 캐릭터, 음악, 이미지, 상표의 저작권 및 모든 권리는 <strong>SEGA Corporation</strong>에 있습니다. 본 봇은 팬 목적으로만 운영됩니다.</p>
+<h2>3. 사용자 책임</h2>
+<p>사용자는 maimai DX net에 로그인된 상태에서 북마클릿을 실행하여 데이터를 전송합니다. 이 과정에서 발생하는 모든 책임은 사용자에게 있습니다.</p>
+<h2>4. 서비스 중단</h2>
+<p>본 서비스는 언제든지 사전 통지 없이 중단될 수 있습니다. 서비스 제공자는 서비스 중단으로 인한 손해에 대해 책임을 지지 않습니다.</p>
+<h2>5. 면책 조항</h2>
+<p>본 서비스는 "있는 그대로" 제공되며, 어떠한 종류의 명시적 또는 묵시적 보증 없이 제공됩니다.</p>
+</body></html>`);
+      return;
+    }
+
     if (req.method === "GET" && url.pathname === "/sync") {
       const token = url.searchParams.get("code") || "";
       if (!findUserBySyncToken(token)) { res.writeHead(403); res.end("expired"); return; }
