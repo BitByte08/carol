@@ -1,0 +1,29 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          script: |
+            cd ~/maimai
+            git pull origin main
+
+            # Zero-downtime: build new image, then swap
+            docker compose build bot
+            docker compose up -d --no-deps bot
+            docker compose up -d --no-deps nginx
+
+            # Cleanup old images
+            docker image prune -f

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+maimai.db
+maimai.db-shm
+maimai.db-wal
+config.json
+debug_*.html
+data/
+nginx/certs/
+.git/
+.omo/
