@@ -58,22 +58,53 @@ export function parseFriendCode(html: string): string {
   return m ? m[1] : "";
 }
 
-export function parseRecentRecords(html: string): { title: string; achievement: string; diff: string; level: string; date: string }[] {
+export interface PlayRecord {
+  title: string;
+  achievement: string;
+  diff: string;
+  level: string;
+  date: string;
+  jacketUrl: string;
+  musicKind: string;
+  achievementVal: number;
+}
+
+function parseOneRecord($: cheerio.CheerioAPI, el: any): PlayRecord | null {
+  const block = $(el).find(".basic_block").first();
+  const level = block.find(".playlog_level_icon").text().trim();
+  const clone = block.clone();
+  clone.find(".w_80").remove();
+  const title = clone.text().trim();
+  if (!title) return null;
+  const ach = $(el).find(".playlog_achievement_txt").text().trim();
+  const achNum = parseFloat(ach.replace(/[^\d.]/g, "")) || 0;
+  const diffSrc = $(el).find(".playlog_diff").attr("src") || "";
+  const diff = diffSrc.includes("remaster") ? "Re:M" : diffSrc.includes("master") ? "M" : diffSrc.includes("expert") ? "E" : diffSrc.includes("advanced") ? "A" : "B";
+  const jacketUrl = absUrl($(el).find(".music_img").attr("src"));
+  const kindSrc = $(el).find(".playlog_music_kind_icon").attr("src") || "";
+  const musicKind = kindSrc.includes("dx") ? "DX" : kindSrc.includes("standard") ? "STA" : "";
+  const date = $(el).find(".playlog_top_container span").eq(1).text().trim();
+  return { title, achievement: ach || "?", diff, level, date, jacketUrl, musicKind, achievementVal: achNum };
+}
+
+export function parseRecentRecords(html: string): PlayRecord[] {
   const $ = cheerio.load(html);
-  const records: { title: string; achievement: string; diff: string; level: string; date: string }[] = [];
-  $(".p_10.t_l.f_0.v_b").each((_: number, el: any) => {
-    const block = $(el).find(".basic_block").first();
-    const level = block.find(".playlog_level_icon").text().trim();
-    const clone = block.clone();
-    clone.find(".w_80").remove();
-    const title = clone.text().trim();
-    const ach = $(el).find(".playlog_achievement_txt").text().trim();
-    const diffSrc = $(el).find(".playlog_diff").attr("src") || "";
-    const diff = diffSrc.includes("remaster") ? "Re:M" : diffSrc.includes("master") ? "M" : diffSrc.includes("expert") ? "E" : diffSrc.includes("advanced") ? "A" : "B";
-    const date = $(el).find(".playlog_top_container span").eq(1).text().trim();
-    if (title) records.push({ title, achievement: ach || "?", diff, level, date });
-  });
+  const records: PlayRecord[] = [];
+  $(".p_10.t_l.f_0.v_b").each((_, el) => { const r = parseOneRecord($, el); if (r) records.push(r); });
   return records.slice(0, 5);
+}
+
+export function parseTop5(html: string): PlayRecord[] {
+  const $ = cheerio.load(html);
+  const records: PlayRecord[] = [];
+  $(".p_10.t_l.f_0.v_b").each((_, el) => { const r = parseOneRecord($, el); if (r) records.push(r); });
+  const best = new Map<string, PlayRecord>();
+  for (const r of records) {
+    const key = r.title + "|" + r.diff + "|" + r.level;
+    const existing = best.get(key);
+    if (!existing || r.achievementVal > existing.achievementVal) best.set(key, r);
+  }
+  return Array.from(best.values()).sort((a, b) => b.achievementVal - a.achievementVal).slice(0, 5);
 }
 
 export function parseSearchResult(html: string): SearchResult {

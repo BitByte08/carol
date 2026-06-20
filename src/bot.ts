@@ -39,6 +39,13 @@ client.on(Events.InteractionCreate, async (i) => {
 });
 
 const TICON: Record<string, string> = { normal: "⚪", bronze: "🟤", silver: "⚪", gold: "🟡", rainbow: "🌈" };
+const TCOLOR: Record<string, number> = { normal: 0x808080, bronze: 0xcd7f32, silver: 0xc0c0c0, gold: 0xffd700, rainbow: 0x8b00ff };
+
+function parseGradeText(gradeImg: string): string {
+  if (!gradeImg) return "";
+  const name = decodeURIComponent(gradeImg.split("/").pop()?.split(".")[0] || "");
+  return name.replace(/^(grade_|class_|dan_)/i, "").toUpperCase();
+}
 
 function buildAvatarAttachment(userId: string): AttachmentBuilder | null {
   const buf = getAvatarBlob(userId);
@@ -47,33 +54,35 @@ function buildAvatarAttachment(userId: string): AttachmentBuilder | null {
 }
 
 function profileEmb(p: NonNullable<ReturnType<typeof getCachedProfile>>, hasAvatar: boolean) {
+  const color = TCOLOR[p.trophyClass] ?? 0x808080;
+  const grade = parseGradeText(p.gradeImg);
   const emb = new EmbedBuilder()
-    .setAuthor({ name: `${TICON[p.trophyClass] || "⚪"} ${p.trophy || ""}` })
-    .setTitle(p.playerName || "???")
-    .setColor(0x888888)
-    .setDescription(`**레이팅 ${p.rating || 0}**${p.ratingMax ? ` (최대 ${p.ratingMax})` : ""}`)
-    .addFields(
-      { name: "등급", value: p.trophyClass || "-", inline: true },
-      { name: "플레이 횟수", value: String(p.playCount || 0), inline: true },
-      { name: "친구 코드", value: p.friendCode || "-", inline: true },
+    .setColor(color)
+    .setAuthor({ name: `${TICON[p.trophyClass] || "⚪"} ${p.trophy || "칭호 없음"} (${p.trophyClass})` })
+    .setTitle(p.playerName || "이름 없음")
+    .setDescription(
+      `★ **${p.rating || 0}**  (최대 ${p.ratingMax || p.rating || 0})\n` +
+      `🎮 ${p.playCount || 0}회${p.stars ? "  ⭐×" + p.stars : ""}${grade ? "  |  등급: " + grade : ""}`
     )
-    .setFooter({ text: `동기화: ${new Date(p.lastSyncedAt).toLocaleString("ko-KR")}` });
+    .addFields({ name: "친구 코드", value: p.friendCode || "-", inline: true })
+    .setFooter({ text: `마지막 동기화: ${new Date(p.lastSyncedAt).toLocaleString("ko-KR")}` });
   if (hasAvatar) emb.setThumbnail("attachment://avatar.png");
   return emb;
 }
 
 function contentEmb(p: NonNullable<ReturnType<typeof getCachedProfile>>, view: string) {
-  if (view === "recent") {
-    const emb = new EmbedBuilder().setColor(0x666666).setTitle("🎵 최근 플레이");
-    try {
-      const r: { title: string; achievement: string; diff: string; level?: string; date?: string }[] = JSON.parse(p.recentJson || "[]");
-      emb.setDescription(r.length
-        ? r.map((s, i) => `\`${i + 1}.\` **${s.title}** \`${s.diff}${s.level ? " " + s.level : ""}\`\n　　${s.achievement}${s.date ? " · " + s.date : ""}`).join("\n")
-        : "기록 없음");
-    } catch { emb.setDescription("데이터 오류"); }
-    return emb;
-  }
-  return new EmbedBuilder().setColor(0x666666).setDescription("준비 중...");
+  const raw = JSON.parse(p.recentJson || "{}");
+  const recentRecords: any[] = Array.isArray(raw) ? raw : (raw.recent || []);
+  const top5Records: any[] = Array.isArray(raw) ? [] : (raw.top5 || []);
+  const records = view === "recent" ? recentRecords : top5Records;
+  const emb = new EmbedBuilder().setColor(0x2b2d31).setTitle(view === "recent" ? "🎵 최근 플레이" : "🏆 TOP 5");
+  if (records.length === 0) { emb.setDescription("기록 없음"); return emb; }
+  emb.setDescription(records.map((r: any, i: number) => {
+    const link = r.jacketUrl ? `[${r.title}](${r.jacketUrl})` : r.title;
+    const kind = r.musicKind ? ` \`${r.musicKind}\`` : "";
+    return `\`${i + 1}.\` ${link} \`${r.diff} ${r.level}\`${kind}\n　${r.achievement}${r.date ? " · " + r.date : ""}`;
+  }).join("\n\n"));
+  return emb;
 }
 
 function selectMenu(view: string) {

@@ -1,6 +1,6 @@
 import * as http from "http";
 import * as fs from "fs";
-import { parseHome, parsePlayerData, parseFriendCode as parseFC, parseRecentRecords } from "./scraper";
+import { parseHome, parsePlayerData, parseFriendCode as parseFC, parseRecentRecords, parseTop5 } from "./scraper";
 import { cacheProfile, saveUserSession, getUserSyncToken, findUserBySyncToken, saveAvatarBlob, getAvatarBlob } from "./db";
 
 let baseUrl = "";
@@ -119,7 +119,8 @@ export function startWebServer(port: number): void {
         const fcRaw = parseFC(fcHtml);
         const fc = effective.friendCode || (/^\d{13}$/.test(fcRaw) ? fcRaw : "") || token;
         const recentRecords = parseRecentRecords(recordHtml);
-        console.log(`[web] recentRecords: ${recentRecords.length} songs`);
+        const top5Records = parseTop5(recordHtml);
+        console.log(`[web] recentRecords: ${recentRecords.length} songs, top5: ${top5Records.length} unique`);
 
         cacheProfile({
           playerName: effective.playerName || "???", rating: effective.rating || 0,
@@ -127,7 +128,7 @@ export function startWebServer(port: number): void {
           avatar: effective.avatar || "", trophy: effective.trophy || "",
           trophyClass: effective.trophyClass || "normal", stars: effective.stars || "0",
           playCount: playCount || 0, comment: effective.comment || "", friendCode: fc,
-        }, playCount || 0, homeHtml, JSON.stringify(recentRecords));
+        }, playCount || 0, homeHtml, JSON.stringify({ recent: recentRecords, top5: top5Records }));
         saveUserSession(userId, "{}", fc);
 
         // base64 아바타 → DB에 저장
