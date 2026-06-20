@@ -102,18 +102,24 @@ function profileEmb(p: NonNullable<ReturnType<typeof getCachedProfile>>, hasAvat
   return emb;
 }
 
-function contentEmb(p: NonNullable<ReturnType<typeof getCachedProfile>>, view: string) {
+function songEmbeds(p: NonNullable<ReturnType<typeof getCachedProfile>>, view: string): EmbedBuilder[] {
   const raw = JSON.parse(p.recentJson || "{}");
   const recentRecords: any[] = Array.isArray(raw) ? raw : (raw.recent || []);
   const top5Records: any[] = Array.isArray(raw) ? [] : (raw.top5 || []);
   const records = view === "recent" ? recentRecords : top5Records;
-  const emb = new EmbedBuilder().setColor(0x2b2d31).setTitle(view === "recent" ? "🎵 최근 플레이" : "🏆 TOP 5");
-  if (records.length === 0) { emb.setDescription("기록 없음"); return emb; }
-  emb.setDescription(records.map((r: any, i: number) => {
-    const kind = r.musicKind ? ` \`${r.musicKind}\`` : "";
-    return `\`${i + 1}.\` **${r.title}** \`${r.diff} ${r.level}\`${kind}\n　${r.achievement}${r.date ? " · " + r.date : ""}`;
-  }).join("\n\n"));
-  return emb;
+  if (records.length === 0) {
+    return [new EmbedBuilder().setColor(0x2b2d31).setDescription("기록 없음")];
+  }
+  return records.map((r: any, i: number) => {
+    const kind = r.musicKind ? ` [${r.musicKind}]` : "";
+    const emb = new EmbedBuilder()
+      .setColor(0x2b2d31)
+      .setAuthor({ name: `${view === "recent" ? "🎵" : "🏆"} #${i + 1}` })
+      .setTitle(r.title)
+      .setDescription(`${kind} \`${r.diff} ${r.level}\`\n${r.achievement}${r.date ? " · " + r.date : ""}`);
+    if (r.jacketUrl) emb.setImage(r.jacketUrl);
+    return emb;
+  });
 }
 
 function selectMenu(view: string) {
@@ -130,7 +136,7 @@ function buildProfileReply(cached: NonNullable<ReturnType<typeof getCachedProfil
   const avatar = buildAvatarAttachment(userId);
   const files = avatar ? [avatar] : [];
   return {
-    embeds: [profileEmb(cached, !!avatar), contentEmb(cached, view)],
+    embeds: [profileEmb(cached, !!avatar), ...songEmbeds(cached, view)],
     components: [selectMenu(view)],
     files,
   };
@@ -175,7 +181,7 @@ async function handleSelect(interaction: StringSelectMenuInteraction) {
   const view = interaction.values[0];
   const avatar = buildAvatarAttachment(userId);
   const files = avatar ? [avatar] : [];
-  await interaction.update({ embeds: [profileEmb(cached, !!avatar), contentEmb(cached, view)], components: [selectMenu(view)], files });
+  await interaction.update({ embeds: [profileEmb(cached, !!avatar), ...songEmbeds(cached, view)], components: [selectMenu(view)], files });
 }
 
 process.on("SIGINT", () => { closeDb(); process.exit(0); });
