@@ -1,7 +1,6 @@
 {
   "token": "YOUR_DISCORD_BOT_TOKEN",
   "clientId": "YOUR_DISCORD_APPLICATION_ID",
-  "guildId": "YOUR_TEST_SERVER_ID_OPTIONAL",
   "webPort": 3456,
   "encryptionKey": "optional-32-char-string-auto-generated-if-empty",
   "baseUrl": "https://maimai.yourdomain.com"
