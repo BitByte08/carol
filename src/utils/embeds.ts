@@ -14,6 +14,10 @@ export function sep(label: string, totalW = 36): string {
   return left + " " + label + " " + right;
 }
 
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, Math.max(0, max - 1)) + "…" : s;
+}
+
 export function buildAvatarAttachment(userId: string): AttachmentBuilder | null {
   const buf = getAvatarBlob(userId);
   if (!buf) return null;
@@ -88,11 +92,11 @@ export function recentEmbeds(
     const musicIdMatch = r.jacketUrl?.match(/\/img\/Music\/([^.]+)\.png/);
     const jacketSrc = musicIdMatch ? `${server}/jacket?id=${musicIdMatch[1]}` : null;
     const rankStr = [r.fc, r.sync].filter(Boolean).join(" · ");
-    const desc = `\`${r.diff} ${r.level}\`` + (rankStr ? `  ·  **${rankStr}**` : "");
+    const desc = `\`${r.diff} ${r.level}\`` + (rankStr ? `  ·  \`${rankStr}\`` : "");
     const emb = new EmbedBuilder()
       .setColor(0x2b2d31)
       .setAuthor({ name: sep("#" + (i + 1), 34) })
-      .setTitle(r.title + kind)
+      .setTitle(truncate(r.title, 60 - kind.length) + kind)
       .setDescription(desc)
       .addFields(
         { name: "달성률", value: r.achievement, inline: true },
@@ -161,11 +165,11 @@ export function rtEmbeds(
     const musicIdMatch = r.jacketUrl?.match(/\/img\/Music\/([^.]+)\.png/);
     const jacketSrc = musicIdMatch ? `${server}/jacket?id=${musicIdMatch[1]}` : null;
     const rankStr = [r.fc, r.sync].filter(Boolean).join(" · ");
-    const desc = `\`${r.diff} ${r.level}\`` + (rankStr ? `  ·  **${rankStr}**` : "");
+    const desc = `\`${r.diff} ${r.level}\`` + (rankStr ? `  ·  \`${rankStr}\`` : "");
     const emb = new EmbedBuilder()
       .setColor(0x2b2d31)
       .setAuthor({ name: sep(`#${rank}`, 34) })
-      .setTitle(r.title + kind)
+      .setTitle(truncate(r.title, 60 - kind.length) + kind)
       .setDescription(desc)
       .addFields({ name: "달성률", value: r.achievement, inline: true });
     if (jacketSrc) emb.setThumbnail(jacketSrc);
