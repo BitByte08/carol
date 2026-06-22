@@ -1,6 +1,6 @@
 import * as http from "http";
 import * as fs from "fs";
-import { parseHome, parsePlayerData, parseFriendCode as parseFC, parseRecentRecords, parseTop5, parseTopSongs, mergeTopRecords } from "./scraper";
+import { parseHome, parsePlayerData, parseFriendCode as parseFC, parseRecentRecords, parseTop5, parseTopSongs, parseRatingTarget, mergeTopRecords } from "./scraper";
 import { cacheProfile, saveUserSession, getUserSyncToken, findUserBySyncToken, saveAvatarBlob, getAvatarBlob, getSongJacket, saveSongJacket } from "./db";
 
 let baseUrl = "";
@@ -26,13 +26,13 @@ function setRow(id,ic,cl,tx){var ei=doc.getElementById('mmsi'+id),et=doc.getElem
 function okRow(id,tx){setRow(id,'\\u2705','#4caf50',tx===undefined?'':tx);}
 function failRow(id,tx){setRow(id,'\\u274C','#e57373',tx||'\\uC624\\uB958');hadErr=true;}
 function skipRow(id,tx){setRow(id,'\\u23ED','#888',tx||'\\uAC74\\uB108\\uB871');}
-addRow('hm','\uD648 \uB370\uC774\uD130');addRow('pd','\uD50C\uB808\uC774\uC5B4 \uB370\uC774\uD130');addRow('rc','\uCD5C\uADFC \uD50C\uB808\uC774');addRow('fc','\uCE5C\uAD6C\uCF54\uB4DC');addRow('tb4','TOP (Re:MASTER)');addRow('tb3','TOP (MASTER)');addRow('tb2','TOP (EXPERT)');addRow('tb1','TOP (ADVANCED)');addRow('tb0','TOP (BASIC)');addRow('av','\uC544\uBC14\uD0C0');addRow('jk','\uC7AC\uD0B7 \uC774\uBBF8\uC9C0');addRow('sv','\uC11C\uBC84 \uC800\uC7A5');
+addRow('hm','\uD648 \uB370\uC774\uD130');addRow('pd','\uD50C\uB808\uC774\uC5B4 \uB370\uC774\uD130');addRow('rc','\uCD5C\uADFC \uD50C\uB808\uC774');addRow('fc','\uCE5C\uAD6C\uCF54\uB4DC');addRow('tb4','\uD074\uB9AC\uC5B4 (Re:MASTER)');addRow('tb3','\uD074\uB9AC\uC5B4 (MASTER)');addRow('tb2','\uD074\uB9AC\uC5B4 (EXPERT)');addRow('tb1','\uD074\uB9AC\uC5B4 (ADVANCED)');addRow('tb0','\uD074\uB9AC\uC5B4 (BASIC)');addRow('rt','\uB808\uC774\uD305 \uACE1');addRow('av','\uC544\uBC14\uD0C0');addRow('jk','\uC7AC\uD0B7 \uC774\uBBF8\uC9C0');addRow('sv','\uC11C\uBC84 \uC800\uC7A5');
 function xf(id,url,opt){return fetch(url).then(function(r){return r.text();}).then(function(t){okRow(id);return t;}).catch(function(){if(opt){skipRow(id);}else{failRow(id,'\\uB124\\uD2B8\\uC6CC\\uD06C \\uC624\\uB958');}return '';});}
-var rs=await Promise.all([xf('hm','/maimai-mobile/home/'),xf('pd','/maimai-mobile/playerData/'),xf('rc','/maimai-mobile/record/'),xf('fc','/maimai-mobile/friend/userFriendCode/'),xf('tb4','/maimai-mobile/record/musicGenre/search/?genre=99&diff=4',true),xf('tb3','/maimai-mobile/record/musicGenre/search/?genre=99&diff=3',true),xf('tb2','/maimai-mobile/record/musicGenre/search/?genre=99&diff=2',true),xf('tb1','/maimai-mobile/record/musicGenre/search/?genre=99&diff=1',true),xf('tb0','/maimai-mobile/record/musicGenre/search/?genre=99&diff=0',true)]);
-var h=rs[0],p=rs[1],rd=rs[2],f=rs[3],tb4=rs[4],tb3=rs[5],tb2=rs[6],tb1=rs[7],tb0=rs[8],a='',js=[];
+var rs=await Promise.all([xf('hm','/maimai-mobile/home/'),xf('pd','/maimai-mobile/playerData/'),xf('rc','/maimai-mobile/record/'),xf('fc','/maimai-mobile/friend/userFriendCode/'),xf('tb4','/maimai-mobile/record/musicGenre/search/?genre=99&diff=4',true),xf('tb3','/maimai-mobile/record/musicGenre/search/?genre=99&diff=3',true),xf('tb2','/maimai-mobile/record/musicGenre/search/?genre=99&diff=2',true),xf('tb1','/maimai-mobile/record/musicGenre/search/?genre=99&diff=1',true),xf('tb0','/maimai-mobile/record/musicGenre/search/?genre=99&diff=0',true),xf('rt','/maimai-mobile/home/ratingTargetMusic/',true)]);
+var h=rs[0],p=rs[1],rd=rs[2],f=rs[3],tb4=rs[4],tb3=rs[5],tb2=rs[6],tb1=rs[7],tb0=rs[8],rt=rs[9],a='',js=[];
 try{var m=h.match(/src="(https:[^"]*Icon[^"]*)"/);if(m){var bl=await fetch(m[1]).then(function(r){return r.blob();});a=await new Promise(function(res){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.readAsDataURL(bl);});okRow('av');}else{skipRow('av','\\uC774\\uBBF8\\uC9C0 \\uC5C6\\uC74C');}}catch(e1){failRow('av');}
 try{var dp=new DOMParser(),d2=dp.parseFromString(rd,'text/html'),imgs=d2.querySelectorAll('.music_img'),cnt=Math.min(imgs.length,5);for(var i=0;i<cnt;i++){try{var src=imgs[i].src;if(src){var bl2=await fetch(src).then(function(r){return r.blob();});var b64=await new Promise(function(res){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.readAsDataURL(bl2);});js.push({url:src,data:b64});}}catch(e2){}}okRow('jk',cnt+'\\uAC1C');}catch(e3){failRow('jk');}
-try{var resp=await fetch(v+'/sync?code='+c,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({h:h,p:p,r:rd,f:f,a:a,js:js,tb4:tb4,tb3:tb3,tb2:tb2,tb1:tb1,tb0:tb0})});if(resp.ok){okRow('sv');}else{failRow('sv','HTTP '+resp.status);}}catch(e4){failRow('sv','\uC5F0\uACB0 \uC2E4\uD328');}
+try{var resp=await fetch(v+'/sync?code='+c,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({h:h,p:p,r:rd,f:f,a:a,js:js,tb4:tb4,tb3:tb3,tb2:tb2,tb1:tb1,tb0:tb0,rt:rt})});if(resp.ok){okRow('sv');}else{failRow('sv','HTTP '+resp.status);}}catch(e4){failRow('sv','\uC5F0\uACB0 \uC2E4\uD328');}
 var fin=doc.createElement('div');fin.style.cssText='margin-top:10px;padding-top:10px;border-top:1px solid #2a2a2a;font-weight:600';if(!hadErr){fin.style.color='#4caf50';fin.textContent='\\u2705 \\uB3D9\\uAE30\\uD654 \\uC644\\uB8CC!';stEl.appendChild(fin);setTimeout(function(){ov.style.transition='opacity .3s';ov.style.opacity='0';setTimeout(function(){ov.remove();},300);},2500);}else{fin.style.color='#e57373';fin.textContent='\\u26A0\\uFE0F \\uC77C\\uBD80 \\uD56D\\uBAA9 \\uC2E4\\uD328';stEl.appendChild(fin);}
 })()`;
 
@@ -269,12 +269,14 @@ a{color:#4caf50}
       const top2Html: string = data.tb2 || "";
       const top1Html: string = data.tb1 || "";
       const top0Html: string = data.tb0 || "";
+      const ratingTargetHtml: string = data.rt || "";
       const avatarBase64: string = data.a || "";
-      console.log(`[web] user=${userId.slice(-6)}, home=${homeHtml.length}B, player=${playerHtml.length}B, record=${recordHtml.length}B, fc=${fcHtml.length}B, top4=${top4Html.length}B, top3=${top3Html.length}B, top2=${top2Html.length}B, top1=${top1Html.length}B, top0=${top0Html.length}B`);
+      console.log(`[web] user=${userId.slice(-6)}, home=${homeHtml.length}B, player=${playerHtml.length}B, record=${recordHtml.length}B, fc=${fcHtml.length}B, top4=${top4Html.length}B, top3=${top3Html.length}B, top2=${top2Html.length}B, top1=${top1Html.length}B, top0=${top0Html.length}B, rt=${ratingTargetHtml.length}B`);
       fs.writeFileSync("debug_home.html", homeHtml, "utf-8");
       fs.writeFileSync("debug_pd.html", playerHtml, "utf-8");
       fs.writeFileSync("debug_fc.html", fcHtml, "utf-8");
       fs.writeFileSync("debug_record.html", recordHtml, "utf-8");
+      if (ratingTargetHtml) fs.writeFileSync("debug_rating_target.html", ratingTargetHtml, "utf-8");
 
       try {
         const home = parseHome(homeHtml);
@@ -287,9 +289,10 @@ a{color:#4caf50}
         const fcRaw = parseFC(fcHtml);
         const fc = effective.friendCode || (/^\d{13}$/.test(fcRaw) ? fcRaw : "") || token;
         const recentRecords = parseRecentRecords(recordHtml);
-        const topHtmls = [top4Html, top3Html, top2Html, top1Html, top0Html].filter((h) => h);
-        const topRecords = topHtmls.length > 0 ? mergeTopRecords(topHtmls.map((h) => parseTopSongs(h))) : parseTop5(recordHtml);
-        console.log(`[web] recentRecords: ${recentRecords.length} songs, top: ${topRecords.length}`);
+        const clearHtmls = [top4Html, top3Html, top2Html, top1Html, top0Html].filter((h) => h);
+        const clearRecords = clearHtmls.length > 0 ? mergeTopRecords(clearHtmls.map((h) => parseTopSongs(h))) : [];
+        const topRecords = ratingTargetHtml ? parseRatingTarget(ratingTargetHtml) : parseTop5(recordHtml);
+        console.log(`[web] recentRecords: ${recentRecords.length} songs, top: ${topRecords.length} (rating target), clear: ${clearRecords.length}`);
 
         cacheProfile({
           playerName: effective.playerName || "???", rating: effective.rating || 0,
@@ -297,7 +300,7 @@ a{color:#4caf50}
           avatar: effective.avatar || "", trophy: effective.trophy || "",
           trophyClass: effective.trophyClass || "normal", stars: effective.stars || "0",
           playCount: playCount || 0, comment: effective.comment || "", friendCode: fc,
-        }, playCount || 0, homeHtml, JSON.stringify(recentRecords), JSON.stringify(topRecords));
+        }, playCount || 0, homeHtml, JSON.stringify(recentRecords), JSON.stringify(topRecords), JSON.stringify(clearRecords));
         saveUserSession(userId, "{}", fc);
 
         // base64 아바타 → DB에 저장

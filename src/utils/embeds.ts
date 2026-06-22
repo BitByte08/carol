@@ -134,7 +134,7 @@ export function recentEmbeds(
 
 const TOP_PAGE_SIZE = 5;
 
-export function topEmbeds(
+export function rtEmbeds(
   p: NonNullable<ReturnType<typeof getCachedProfile>>,
   userId: string,
   port: number,
@@ -144,7 +144,7 @@ export function topEmbeds(
 
   if (records.length === 0) {
     return {
-      embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription("TOP 기록 없음\n북마클릿을 다시 실행하면 업데이트됩니다.")],
+      embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription("레이팅 기록 없음\n북마클릿을 다시 실행하면 업데이트됩니다.")],
       components: [],
     };
   }
@@ -173,17 +173,17 @@ export function topEmbeds(
   });
 
   const prevBtn = new ButtonBuilder()
-    .setCustomId(`toppage:${userId}:${idx - 1}`)
+    .setCustomId(`rtpage:${userId}:${idx - 1}`)
     .setLabel("◀ 이전")
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(idx === 0);
   const countBtn = new ButtonBuilder()
-    .setCustomId("toppage_noop")
+    .setCustomId("rtpage_noop")
     .setLabel(`${idx + 1} / ${totalPages}`)
     .setStyle(ButtonStyle.Primary)
     .setDisabled(true);
   const nextBtn = new ButtonBuilder()
-    .setCustomId(`toppage:${userId}:${idx + 1}`)
+    .setCustomId(`rtpage:${userId}:${idx + 1}`)
     .setLabel("다음 ▶")
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(idx === totalPages - 1);
@@ -193,7 +193,7 @@ export function topEmbeds(
   const shareRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     page.map((_, si) =>
       new ButtonBuilder()
-        .setCustomId(`topshare:${userId}:${idx}:${si}`)
+        .setCustomId(`rtshare:${userId}:${idx}:${si}`)
         .setLabel(`#${start + si + 1} 공유`)
         .setStyle(ButtonStyle.Success),
     ),
@@ -213,8 +213,8 @@ export function buildProfileReply(
     .setLabel("최근 플레이")
     .setStyle(ButtonStyle.Secondary);
   const topBtn = new ButtonBuilder()
-    .setCustomId(`top:${userId}`)
-    .setLabel("TOP 곡들")
+    .setCustomId(`rt:${userId}`)
+    .setLabel("레이팅 곡들")
     .setStyle(ButtonStyle.Primary);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(recentBtn, topBtn);
   return {

@@ -3,7 +3,7 @@ import { initEncryption } from "./crypto";
 import { startWebServer, setBaseUrl } from "./web";
 import { closeDb, loadUserSession, getCachedProfile } from "./db";
 import { CONFIG, PORT } from "./config";
-import { recentEmbeds, topEmbeds } from "./utils/embeds";
+import { recentEmbeds, rtEmbeds } from "./utils/embeds";
 
 import * as profile     from "./commands/profile";
 import * as bookmarklet from "./commands/bookmarklet";
@@ -86,7 +86,7 @@ client.on(Events.InteractionCreate, async (i) => {
       }
       return;
     }
-    if (i.customId.startsWith("top:") || i.customId.startsWith("toppage:")) {
+    if (i.customId.startsWith("rt:") || i.customId.startsWith("rtpage:")) {
       try {
         const parts = i.customId.split(":");
         const userId = parts[1];
@@ -95,18 +95,18 @@ client.on(Events.InteractionCreate, async (i) => {
         if (!stored?.friendCode) { await (i as ButtonInteraction).reply({ content: "프로필을 먼저 등록하세요.", ephemeral: true }); return; }
         const cached = getCachedProfile(stored.friendCode);
         if (!cached) { await (i as ButtonInteraction).reply({ content: "프로필을 먼저 등록하세요.", ephemeral: true }); return; }
-        const result = topEmbeds(cached, userId, PORT, pageIdx);
-        if (i.customId.startsWith("top:")) {
+        const result = rtEmbeds(cached, userId, PORT, pageIdx);
+        if (i.customId.startsWith("rt:")) {
           await (i as ButtonInteraction).reply({ ...result, ephemeral: true });
         } else {
           await (i as ButtonInteraction).update(result);
         }
       } catch (e) {
-        console.error("[top-btn]", e);
+        console.error("[rt-btn]", e);
       }
       return;
     }
-    if (i.customId.startsWith("topshare:")) {
+    if (i.customId.startsWith("rtshare:")) {
       try {
         const parts = i.customId.split(":");
         const targetUserId = parts[1];
@@ -116,13 +116,13 @@ client.on(Events.InteractionCreate, async (i) => {
         if (!stored?.friendCode) { await (i as ButtonInteraction).reply({ content: "프로필을 찾을 수 없습니다.", ephemeral: true }); return; }
         const cached = getCachedProfile(stored.friendCode);
         if (!cached) { await (i as ButtonInteraction).reply({ content: "프로필을 찾을 수 없습니다.", ephemeral: true }); return; }
-        const result = topEmbeds(cached, targetUserId, PORT, pageIdx);
+        const result = rtEmbeds(cached, targetUserId, PORT, pageIdx);
         const emb = result.embeds[songIdx];
         if (!emb) { await (i as ButtonInteraction).reply({ content: "곡을 찾을 수 없습니다.", ephemeral: true }); return; }
-        emb.setFooter({ text: `${cached.playerName}의 TOP  ·  공유: ${i.user.username}` });
+        emb.setFooter({ text: `${cached.playerName}의 레이팅 곡  ·  공유: ${i.user.username}` });
         await (i as ButtonInteraction).reply({ embeds: [emb] });
       } catch (e) {
-        console.error("[topshare-btn]", e);
+        console.error("[rtshare-btn]", e);
       }
       return;
     }

@@ -130,6 +130,13 @@ export function parseTopSongs(html: string): PlayRecord[] {
   return records;
 }
 
+export function parseRatingTarget(html: string): PlayRecord[] {
+  const $ = cheerio.load(html);
+  const records: PlayRecord[] = [];
+  $(".p_10.t_l.f_0.v_b").each((_, el) => { const r = parseOneRecord($, el); if (r) records.push(r); });
+  return records;
+}
+
 export function parseTop5(html: string): PlayRecord[] {
   const $ = cheerio.load(html);
   const records: PlayRecord[] = [];

@@ -21,6 +21,7 @@ export interface CachedProfile {
   lastSyncedAt: number;
   recentJson: string;
   topJson: string;
+  clearJson: string;
 }
 
 // ─── DB Setup ───────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ db.exec(`
     raw_html TEXT DEFAULT '',
     recent_json TEXT DEFAULT '[]',
     top_json TEXT DEFAULT '[]',
+    clear_json TEXT DEFAULT '[]',
     last_synced_at INTEGER DEFAULT 0,
     created_at INTEGER DEFAULT (strftime('%s','now') * 1000)
   );
@@ -77,12 +79,13 @@ db.exec(`
 `);
 
 try { db.exec("ALTER TABLE profiles ADD COLUMN top_json TEXT DEFAULT '[]'"); } catch (_) {}
+try { db.exec("ALTER TABLE profiles ADD COLUMN clear_json TEXT DEFAULT '[]'"); } catch (_) {}
 
 // ─── Queries ────────────────────────────────────────────────────────────
-const stmtGet = db.prepare("SELECT friend_code AS friendCode, player_name AS playerName, rating, rating_max AS ratingMax, trophy, trophy_class AS trophyClass, avatar, grade_img AS gradeImg, stars, comment, play_count AS playCount, raw_html AS rawHtml, recent_json AS recentJson, top_json AS topJson, last_synced_at AS lastSyncedAt FROM profiles WHERE friend_code = ?");
+const stmtGet = db.prepare("SELECT friend_code AS friendCode, player_name AS playerName, rating, rating_max AS ratingMax, trophy, trophy_class AS trophyClass, avatar, grade_img AS gradeImg, stars, comment, play_count AS playCount, raw_html AS rawHtml, recent_json AS recentJson, top_json AS topJson, clear_json AS clearJson, last_synced_at AS lastSyncedAt FROM profiles WHERE friend_code = ?");
 const stmtUpsert = db.prepare(`
-  INSERT INTO profiles (friend_code, player_name, rating, rating_max, trophy, trophy_class, avatar, grade_img, stars, comment, play_count, raw_html, recent_json, top_json, last_synced_at)
-  VALUES (@friendCode, @playerName, @rating, @ratingMax, @trophy, @trophyClass, @avatar, @gradeImg, @stars, @comment, @playCount, @rawHtml, @recentJson, @topJson, @lastSyncedAt)
+  INSERT INTO profiles (friend_code, player_name, rating, rating_max, trophy, trophy_class, avatar, grade_img, stars, comment, play_count, raw_html, recent_json, top_json, clear_json, last_synced_at)
+  VALUES (@friendCode, @playerName, @rating, @ratingMax, @trophy, @trophyClass, @avatar, @gradeImg, @stars, @comment, @playCount, @rawHtml, @recentJson, @topJson, @clearJson, @lastSyncedAt)
   ON CONFLICT(friend_code) DO UPDATE SET
     player_name = excluded.player_name,
     rating = excluded.rating,
@@ -97,12 +100,13 @@ const stmtUpsert = db.prepare(`
     raw_html = excluded.raw_html,
     recent_json = excluded.recent_json,
     top_json = excluded.top_json,
+    clear_json = excluded.clear_json,
     last_synced_at = excluded.last_synced_at
 `);
 const stmtDelete = db.prepare("DELETE FROM profiles WHERE friend_code = ?");
 
 // ─── Public API ─────────────────────────────────────────────────────────
-export function cacheProfile(profile: MaimaiProfile, playCount: number, rawHtml: string, recentJson = "[]", topJson = "[]"): void {
+export function cacheProfile(profile: MaimaiProfile, playCount: number, rawHtml: string, recentJson = "[]", topJson = "[]", clearJson = "[]"): void {
   const data: CachedProfile = {
     friendCode: profile.friendCode ?? "me",
     playerName: profile.playerName,
@@ -118,6 +122,7 @@ export function cacheProfile(profile: MaimaiProfile, playCount: number, rawHtml:
     rawHtml,
     recentJson,
     topJson,
+    clearJson,
     lastSyncedAt: Date.now(),
   };
   stmtUpsert.run(data);
