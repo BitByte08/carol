@@ -105,7 +105,8 @@ function parseOneRecord($: cheerio.CheerioAPI, el: any): PlayRecord | null {
     : "BASIC";
   const jacketUrl = absUrl($(el).find(".music_img").attr("src"));
   const kindSrc = $(el).find(".playlog_music_kind_icon").attr("src") || "";
-  const musicKind = kindSrc.includes("dx") ? "DX" : kindSrc.includes("standard") ? "STA" : "";
+  const kindFile = kindSrc.split("/").pop() || "";
+  const musicKind = kindFile.includes("_dx") ? "DX" : kindFile.includes("_standard") ? "STA" : "";
   const date = $(el).find(".playlog_top_container span").eq(1).text().trim();
   const trackText = $(el).find(".playlog_top_container .red.f_b.v_b").text().trim();
   const track = parseInt(trackText.replace(/[^0-9]/g, "")) || 0;

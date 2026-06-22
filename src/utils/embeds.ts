@@ -113,8 +113,18 @@ export function recentEmbeds(
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(idx === total - 1);
 
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(prevBtn, countBtn, nextBtn);
-  return { embeds, components: [row] };
+  const navRow = new ActionRowBuilder<ButtonBuilder>().addComponents(prevBtn, countBtn, nextBtn);
+
+  const shareRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    game.map((_, si) =>
+      new ButtonBuilder()
+        .setCustomId(`share:${userId}:${idx}:${si}`)
+        .setLabel(`#${si + 1} 공유`)
+        .setStyle(ButtonStyle.Success),
+    ),
+  );
+
+  return { embeds, components: [navRow, shareRow] };
 }
 
 export function buildProfileReply(

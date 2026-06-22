@@ -66,6 +66,26 @@ client.on(Events.InteractionCreate, async (i) => {
       }
       return;
     }
+    if (i.customId.startsWith("share:")) {
+      try {
+        const parts = i.customId.split(":");
+        const targetUserId = parts[1];
+        const gameIdx = parseInt(parts[2]) || 0;
+        const songIdx = parseInt(parts[3]) || 0;
+        const stored = loadUserSession(targetUserId);
+        if (!stored?.friendCode) { await (i as ButtonInteraction).reply({ content: "프로필을 찾을 수 없습니다.", ephemeral: true }); return; }
+        const cached = getCachedProfile(stored.friendCode);
+        if (!cached) { await (i as ButtonInteraction).reply({ content: "프로필을 찾을 수 없습니다.", ephemeral: true }); return; }
+        const result = recentEmbeds(cached, targetUserId, PORT, gameIdx);
+        const emb = result.embeds[songIdx];
+        if (!emb) { await (i as ButtonInteraction).reply({ content: "곡을 찾을 수 없습니다.", ephemeral: true }); return; }
+        emb.setFooter({ text: `${cached.playerName}의 플레이  ·  공유: ${i.user.username}` });
+        await (i as ButtonInteraction).reply({ embeds: [emb] });
+      } catch (e) {
+        console.error("[share-btn]", e);
+      }
+      return;
+    }
   }
 });
 
