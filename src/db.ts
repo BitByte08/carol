@@ -193,6 +193,11 @@ export function loadUserSession(discordUserId: string): { friendCode: string } |
   }
 }
 
+export function getUserFriendCode(discordUserId: string): string | null {
+  const row = db.prepare("SELECT friend_code FROM sessions WHERE discord_user_id = ?").get(discordUserId) as { friend_code: string } | undefined;
+  return row?.friend_code || null;
+}
+
 // ─── Persistent sync token per user ─────────────────────────────────────
 export function getUserSyncToken(discordUserId: string): string {
   const row = db.prepare("SELECT sync_token FROM sessions WHERE discord_user_id = ?").get(discordUserId) as { sync_token: string } | undefined;
