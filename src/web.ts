@@ -1,6 +1,6 @@
 import * as http from "http";
 import * as fs from "fs";
-import { parseHome, parsePlayerData, parseFriendCode as parseFC, parseRecentRecords, parseTop5 } from "./scraper";
+import { parseHome, parsePlayerData, parseFriendCode as parseFC, parseRecentRecords, parseTop5, parseTopSongs } from "./scraper";
 import { cacheProfile, saveUserSession, getUserSyncToken, findUserBySyncToken, saveAvatarBlob, getAvatarBlob, getSongJacket, saveSongJacket } from "./db";
 
 let baseUrl = "";
@@ -15,9 +15,9 @@ export function buildBookmarklet(token: string, port: number): string {
 const bookmarkletJs = `(async()=>{
 var e=document,s=e.currentScript.src,u=new URL(s),c=u.searchParams.get('code')||'',v=u.origin;
 var x=function(a){return fetch(a).then(function(r){return r.text()})};
-var q=['/maimai-mobile/home/','/maimai-mobile/playerData/','/maimai-mobile/record/','/maimai-mobile/friend/userFriendCode/'];
+var q=['/maimai-mobile/home/','/maimai-mobile/playerData/','/maimai-mobile/record/','/maimai-mobile/friend/userFriendCode/','/maimai-mobile/record/musicBest/'];
 var r=await Promise.all(q.map(x));
-var h=r[0],p=r[1],rd=r[2],f=r[3],a='',js=[];
+var h=r[0],p=r[1],rd=r[2],f=r[3],tb=r[4],a='',js=[];
 try{
   var m=h.match(/src="(https:[^"]*Icon[^"]*)"/);
   if(m){var b=await fetch(m[1]).then(function(t){return t.blob()});
@@ -34,7 +34,7 @@ try{
     }}catch(e2){}
   }
 }catch(e){}
-await fetch(v+'/sync?code='+c,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({h:h,p:p,r:rd,f:f,a:a,js:js})});
+await fetch(v+'/sync?code='+c,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({h:h,p:p,r:rd,f:f,a:a,js:js,tb:tb})});
 alert('\\uC644\\uB8CC!')
 })()`;
 
@@ -264,8 +264,9 @@ a{color:#4caf50}
       const playerHtml: string = data.p || "";
       const fcHtml: string = data.f || "";
       const recordHtml: string = data.r || "";
+      const topHtml: string = data.tb || "";
       const avatarBase64: string = data.a || "";
-      console.log(`[web] user=${userId.slice(-6)}, home=${homeHtml.length}B, player=${playerHtml.length}B, record=${recordHtml.length}B, fc=${fcHtml.length}B`);
+      console.log(`[web] user=${userId.slice(-6)}, home=${homeHtml.length}B, player=${playerHtml.length}B, record=${recordHtml.length}B, fc=${fcHtml.length}B, top=${topHtml.length}B`);
       fs.writeFileSync("debug_home.html", homeHtml, "utf-8");
       fs.writeFileSync("debug_pd.html", playerHtml, "utf-8");
       fs.writeFileSync("debug_fc.html", fcHtml, "utf-8");
@@ -273,7 +274,6 @@ a{color:#4caf50}
 
       try {
         const home = parseHome(homeHtml);
-        // home 파싱 실패 시 playerData에서 재시도
         const usePd = !home.playerName && playerHtml;
         const effective = usePd ? parseHome(playerHtml) : home;
         console.log(`[web] parseHome: name="${effective.playerName}", rating=${effective.rating}, fc=${effective.friendCode}, usePd=${usePd}`);
@@ -283,8 +283,8 @@ a{color:#4caf50}
         const fcRaw = parseFC(fcHtml);
         const fc = effective.friendCode || (/^\d{13}$/.test(fcRaw) ? fcRaw : "") || token;
         const recentRecords = parseRecentRecords(recordHtml);
-        const top5Records = parseTop5(recordHtml);
-        console.log(`[web] recentRecords: ${recentRecords.length} songs, top5: ${top5Records.length} unique`);
+        const topRecords = topHtml ? parseTopSongs(topHtml) : parseTop5(recordHtml);
+        console.log(`[web] recentRecords: ${recentRecords.length} songs, top: ${topRecords.length}`);
 
         cacheProfile({
           playerName: effective.playerName || "???", rating: effective.rating || 0,
@@ -292,7 +292,7 @@ a{color:#4caf50}
           avatar: effective.avatar || "", trophy: effective.trophy || "",
           trophyClass: effective.trophyClass || "normal", stars: effective.stars || "0",
           playCount: playCount || 0, comment: effective.comment || "", friendCode: fc,
-        }, playCount || 0, homeHtml, JSON.stringify({ recent: recentRecords, top5: top5Records }));
+        }, playCount || 0, homeHtml, JSON.stringify(recentRecords), JSON.stringify(topRecords));
         saveUserSession(userId, "{}", fc);
 
         // base64 아바타 → DB에 저장
