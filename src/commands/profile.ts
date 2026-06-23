@@ -2,7 +2,6 @@ import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags } from "
 import { getCachedProfile, getUserFriendCode } from "../db";
 import { buildProfileReply } from "../utils/embeds";
 import { autoRole } from "../utils/roles";
-import { PORT } from "../config";
 
 export const data = new SlashCommandBuilder()
   .setName("프로필")
@@ -18,7 +17,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   if (friendCode) {
     const cached = getCachedProfile(friendCode);
     if (cached) {
-      await interaction.reply(buildProfileReply(cached, userId, PORT));
+      await interaction.reply(buildProfileReply(cached, userId));
       if (target.id === interaction.user.id) autoRole(interaction, cached.rating);
       return;
     }

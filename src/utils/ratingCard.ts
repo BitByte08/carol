@@ -1,0 +1,256 @@
+import satori from "satori";
+import { Resvg } from "@resvg/resvg-js";
+import type { PlayRecord } from "../scraper";
+import type { CachedProfile } from "../db";
+import { getSongJacket, saveSongJacket } from "../db";
+import { getConstant, levelToNumber, calcSongRating, getJacketFile } from "../constants";
+import { loadFonts } from "../fonts";
+
+// ─── Design tokens (ported from mailog) ──────────────────────────────────
+const CARD_W = 110;
+const CARD_H = 115;
+const GAP = 4;
+const ACCENT = "#9333ea";
+
+const MAI_DIFF_COLOR: Record<string, string> = {
+  BASIC: "#16a34a",
+  ADVANCED: "#ea580c",
+  EXPERT: "#dc2626",
+  MASTER: "#9333ea",
+  "Re:MASTER": "#c084fc",
+};
+
+const MAI_CM_COLOR: Record<string, string> = {
+  "SSS+": "#d97706", SSS: "#f59e0b", "SS+": "#fbbf24", SS: "#fbbf24",
+  "S+": "#fb923c", S: "#fb923c", AAA: "#60a5fa", AA: "#60a5fa", A: "#93c5fd",
+  BBB: "#7dd3fc", BB: "#bae6fd", B: "#e0f2fe", C: "#d1d5db", D: "#9ca3af",
+  "AP+": "#d946ef", AP: "#d946ef", "FC+": "#3b82f6", FC: "#60a5fa",
+  "FS+": "#22c55e", FS: "#4ade80", FSD: "#34d399", "FSD+": "#10b981",
+};
+
+function scoreRank(ach: number): string {
+  if (ach >= 100.5) return "SSS+";
+  if (ach >= 100.0) return "SSS";
+  if (ach >= 99.5)  return "SS+";
+  if (ach >= 99.0)  return "SS";
+  if (ach >= 98.0)  return "S+";
+  if (ach >= 97.0)  return "S";
+  if (ach >= 94.0)  return "AAA";
+  if (ach >= 90.0)  return "AA";
+  if (ach >= 80.0)  return "A";
+  if (ach >= 75.0)  return "BBB";
+  if (ach >= 70.0)  return "BB";
+  if (ach >= 60.0)  return "B";
+  if (ach >= 50.0)  return "C";
+  return "D";
+}
+
+// ─── Satori element helper (no JSX) ───────────────────────────────────────
+type El = { type: string; props: { style: Record<string, unknown>; children?: unknown } };
+function el(type: string, style: Record<string, unknown>, children?: unknown): El {
+  return { type, props: { style, children } };
+}
+
+// ─── Per-song view model ──────────────────────────────────────────────────
+interface CardVM {
+  title: string;
+  ach: string;
+  rank: string;
+  rs: number;
+  lv: string;
+  diff: string;
+  diffColor: string;
+  isDx: boolean;
+  jacketFile: string | null;
+}
+
+function toVM(r: PlayRecord): CardVM {
+  const constant = getConstant(r.title, r.musicKind, r.diff);
+  const lvNum = constant !== null ? constant : levelToNumber(r.level);
+  const rs = calcSongRating(r.achievementVal, lvNum);
+  return {
+    title: r.title,
+    ach: r.achievementVal > 0 ? r.achievementVal.toFixed(4) + "%" : r.achievement,
+    rank: scoreRank(r.achievementVal),
+    rs,
+    lv: constant !== null ? constant.toFixed(1) : r.level,
+    diff: r.diff,
+    diffColor: MAI_DIFF_COLOR[r.diff] ?? "#888",
+    isDx: r.musicKind === "DX",
+    jacketFile: getJacketFile(r.title),
+  };
+}
+
+// ─── Jacket prefetch (DB cache → otoge-db) ────────────────────────────────
+// 레이팅 대상곡 페이지엔 자켓이 없어 otoge-db의 image_url(파일명)로 받아온다.
+async function fetchJacketDataUrl(file: string): Promise<string | null> {
+  const key = file.replace(/\.png$/, "");
+  let buf = getSongJacket(key);
+  if (!buf) {
+    try {
+      const res = await fetch(`https://otoge-db.net/maimai/jacket/${file}`);
+      if (res.ok) {
+        buf = Buffer.from(await res.arrayBuffer());
+        saveSongJacket(key, buf);
+      }
+    } catch { /* ignore */ }
+  }
+  return buf ? `data:image/png;base64,${buf.toString("base64")}` : null;
+}
+
+// ─── Card component ───────────────────────────────────────────────────────
+function jacketCard(vm: CardVM, rank: number, jacketUrl: string | null): El {
+  const layers: El[] = [];
+
+  layers.push(
+    jacketUrl
+      ? el("img", { position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, objectFit: "cover" }, undefined) as any
+      : el("div", { position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, background: "#1c1c1c" }),
+  );
+  if (jacketUrl) (layers[0] as any).props.src = jacketUrl;
+
+  // gradient overlay
+  layers.push(el("div", {
+    position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H,
+    backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.05) 28%, rgba(0,0,0,0.65) 55%, rgba(0,0,0,0.93) 100%)",
+  }));
+
+  // rank badge
+  layers.push(el("div", { position: "absolute", top: 5, left: 6, display: "flex" },
+    el("span", { fontSize: 8, color: "rgba(255,255,255,0.7)", fontWeight: 600 }, `#${rank}`),
+  ));
+
+  // bottom info block
+  const infoRows: El[] = [];
+  infoRows.push(el("div", { fontSize: 19, fontWeight: 800, color: "#fff", lineHeight: 1 }, String(vm.rs)));
+
+  infoRows.push(el("div", { display: "flex", alignItems: "baseline", width: "100%" }, [
+    el("span", { fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.9)" }, vm.lv),
+    el("span", { fontSize: 8, fontWeight: 600, color: "rgba(255,255,255,0.78)", marginLeft: 4 }, vm.ach),
+    el("span", { fontSize: 7, fontWeight: 800, color: vm.isDx ? "#f97316" : "rgba(255,255,255,0.65)", marginLeft: "auto" }, vm.isDx ? "DX" : "ST"),
+  ]));
+
+  infoRows.push(el("div", {
+    fontSize: 9, fontWeight: 600, color: "#ddd", lineHeight: 1.25,
+    width: "100%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+  }, vm.title));
+
+  infoRows.push(el("div", { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }, [
+    el("span", { fontSize: 7, fontWeight: 700, color: vm.diffColor }, vm.diff),
+    el("span", { fontSize: 7, fontWeight: 700, color: MAI_CM_COLOR[vm.rank] ?? "rgba(255,255,255,0.65)" }, vm.rank),
+  ]));
+
+  layers.push(el("div", {
+    position: "absolute", bottom: 0, left: 0, width: CARD_W,
+    display: "flex", flexDirection: "column", padding: "5px 6px 6px",
+  }, infoRows));
+
+  return el("div", {
+    position: "relative", display: "flex", width: CARD_W, height: CARD_H,
+    overflow: "hidden", border: "1px solid #252525", borderTop: `3px solid ${vm.diffColor}`,
+  }, layers);
+}
+
+function sectionLabel(label: string, count: number, avg: number): El {
+  return el("div", {
+    display: "flex", alignItems: "baseline", width: "100%",
+    padding: "8px 0 4px", borderBottom: "1px solid #202020", marginTop: 8,
+  }, [
+    el("span", { fontSize: 10, fontWeight: 700, color: "#aaa" }, label),
+    el("span", { fontSize: 9, color: "#666", marginLeft: 8 }, `TOP ${count}`),
+    el("span", { fontSize: 9, color: "#777", marginLeft: "auto" }, `avg ${avg.toFixed(1)}`),
+  ]);
+}
+
+function cardGrid(vms: CardVM[], cols: number, startRank: number, jackets: Map<string, string>): El {
+  const width = CARD_W * cols + GAP * (cols - 1);
+  const cards = vms.map((vm, i) =>
+    jacketCard(vm, startRank + i, vm.jacketFile ? jackets.get(vm.jacketFile) ?? null : null),
+  );
+  return el("div", { display: "flex", flexWrap: "wrap", width, marginTop: 5, gap: GAP }, cards);
+}
+
+function avg(vms: CardVM[]): number {
+  if (!vms.length) return 0;
+  return vms.reduce((s, v) => s + v.rs, 0) / vms.length;
+}
+
+// ─── Public: render rating target card as PNG ─────────────────────────────
+export async function renderRatingCard(
+  profile: CachedProfile,
+  records: PlayRecord[],
+  avatarBuf: Buffer | null,
+): Promise<Buffer> {
+  const fonts = await loadFonts();
+
+  const newVms = records.slice(0, 15).map(toVM);
+  const otherVms = records.slice(15, 50).map(toVM);
+  const totalRs = newVms.concat(otherVms).reduce((s, v) => s + v.rs, 0);
+
+  // prefetch all jacket images
+  const files = [...new Set([...newVms, ...otherVms].flatMap((v) => (v.jacketFile ? [v.jacketFile] : [])))];
+  const jackets = new Map<string, string>();
+  await Promise.all(files.map(async (file) => {
+    const url = await fetchJacketDataUrl(file);
+    if (url) jackets.set(file, url);
+  }));
+
+  const leftCols = 3, rightCols = 7;
+  const leftWidth = CARD_W * leftCols + GAP * (leftCols - 1);
+  const rightWidth = CARD_W * rightCols + GAP * (rightCols - 1);
+  const bodyWidth = leftWidth + 12 + rightWidth;
+  const PAD = 16;
+  const totalWidth = bodyWidth + PAD * 2;
+
+  // header
+  const avatarUrl = avatarBuf ? `data:image/png;base64,${avatarBuf.toString("base64")}` : null;
+  const profileBlock = el("div", { display: "flex", alignItems: "center", gap: 10 }, [
+    avatarUrl
+      ? { type: "img", props: { src: avatarUrl, style: { width: 38, height: 38, objectFit: "cover" } } } as any
+      : el("div", { width: 38, height: 38, background: "#242424", display: "flex" }),
+    el("div", { display: "flex", flexDirection: "column" }, [
+      ...(profile.trophy ? [el("span", { fontSize: 8, color: "#888", marginBottom: 1 }, profile.trophy)] : []),
+      el("span", { fontSize: 12, fontWeight: 700, color: "#fff" }, profile.playerName || "—"),
+    ]),
+  ]);
+
+  const wordmark = el("div", { display: "flex", alignItems: "baseline" }, [
+    el("span", { fontSize: 13, fontWeight: 700, color: "#888", marginRight: 6 }, "Created by"),
+    el("span", { fontSize: 13, fontWeight: 800, color: "#fff" }, "Carol"),
+    el("span", { fontSize: 13, fontWeight: 800, color: ACCENT }, "bot"),
+  ]);
+
+  const ratingBlock = el("div", { display: "flex", flexDirection: "column", alignItems: "flex-end" }, [
+    el("span", { fontSize: 8, color: "#777" }, "RATING"),
+    el("span", { fontSize: 20, fontWeight: 800, color: ACCENT, lineHeight: 1.1 }, String(totalRs)),
+  ]);
+
+  // 3등분 컬럼: 가운데 칸이 이미지 정중앙에 고정되도록 각 칸 flex:1
+  const header = el("div", {
+    display: "flex", alignItems: "center",
+    width: bodyWidth, paddingBottom: 10, borderBottom: "1px solid #1e1e1e",
+  }, [
+    el("div", { display: "flex", flex: 1, justifyContent: "flex-start" }, profileBlock),
+    el("div", { display: "flex", flex: 1, justifyContent: "center" }, wordmark),
+    el("div", { display: "flex", flex: 1, justifyContent: "flex-end" }, ratingBlock),
+  ]);
+
+  const body = el("div", { display: "flex", marginTop: 10, gap: 12, alignItems: "flex-start" }, [
+    el("div", { display: "flex", flexDirection: "column", width: leftWidth }, [
+      sectionLabel("NEW", newVms.length, avg(newVms)),
+      cardGrid(newVms, leftCols, 1, jackets),
+    ]),
+    el("div", { display: "flex", flexDirection: "column", width: rightWidth }, [
+      sectionLabel("OTHERS", otherVms.length, avg(otherVms)),
+      cardGrid(otherVms, rightCols, 1, jackets),
+    ]),
+  ]);
+
+  const root = el("div", {
+    display: "flex", flexDirection: "column", background: "#0d0d0d", padding: PAD,
+  }, [header, body]);
+
+  const svg = await satori(root as any, { width: totalWidth, fonts: fonts as any });
+  const png = new Resvg(svg, { fitTo: { mode: "width", value: totalWidth * 2 } }).render().asPng();
+  return Buffer.from(png);
+}

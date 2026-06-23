@@ -2,7 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from "
 import { RATING_ROLES } from "../utils/roles";
 
 export const data = new SlashCommandBuilder()
-  .setName("레이팅표")
+  .setName("레이팅기준표")
   .setDescription("레이팅 티어 기준표 보기");
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {

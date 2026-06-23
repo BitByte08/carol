@@ -2,10 +2,35 @@ import {
   EmbedBuilder, AttachmentBuilder,
   ButtonBuilder, ButtonStyle, ActionRowBuilder,
 } from "discord.js";
-import { getCachedProfile, getAvatarBlob } from "../db";
-import { getBaseUrl } from "../web";
+import { getCachedProfile, getAvatarBlob, getSongJacket, saveSongJacket } from "../db";
+import { getConstant, getJacketFile } from "../constants";
 import { ratingColor } from "./roles";
 import type { PlayRecord } from "../scraper";
+
+// 곡 자켓 버퍼: DB 캐시 → maimai net(musicId) → otoge-db(title) 순으로 확보하고 캐시
+export async function jacketBuffer(r: PlayRecord): Promise<Buffer | null> {
+  const m = r.jacketUrl?.match(/\/img\/Music\/([^.]+)\.png/);
+  const musicId = m ? m[1] : null;
+  if (musicId) {
+    const cached = getSongJacket(musicId);
+    if (cached) return cached;
+    try {
+      const res = await fetch(`https://maimaidx-eng.com/maimai-mobile/img/Music/${musicId}.png`);
+      if (res.ok) { const b = Buffer.from(await res.arrayBuffer()); saveSongJacket(musicId, b); return b; }
+    } catch { /* ignore */ }
+  }
+  const file = getJacketFile(r.title);
+  if (file) {
+    const key = file.replace(/\.png$/, "");
+    const cached = getSongJacket(key);
+    if (cached) return cached;
+    try {
+      const res = await fetch(`https://otoge-db.net/maimai/jacket/${file}`);
+      if (res.ok) { const b = Buffer.from(await res.arrayBuffer()); saveSongJacket(key, b); return b; }
+    } catch { /* ignore */ }
+  }
+  return null;
+}
 
 export function sep(label: string, totalW = 36): string {
   const frame = Math.max(0, totalW - label.length - 2);
@@ -100,12 +125,11 @@ export function groupByGame(records: PlayRecord[]): PlayRecord[][] {
   return games;
 }
 
-export function recentEmbeds(
+export async function recentEmbeds(
   p: NonNullable<ReturnType<typeof getCachedProfile>>,
   userId: string,
-  port: number,
   gameIdx: number,
-): { embeds: EmbedBuilder[]; components: ActionRowBuilder<ButtonBuilder>[] } {
+): Promise<{ embeds: EmbedBuilder[]; components: ActionRowBuilder<ButtonBuilder>[]; files: AttachmentBuilder[] }> {
   const records = getSongList(p);
   const games = groupByGame(records);
   const total = games.length;
@@ -114,19 +138,20 @@ export function recentEmbeds(
     return {
       embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription("기록 없음")],
       components: [],
+      files: [],
     };
   }
 
   const idx = Math.max(0, Math.min(gameIdx, total - 1));
   const game = games[idx];
-  const server = getBaseUrl(port);
+  const files: AttachmentBuilder[] = [];
 
-  const embeds = game.map((r, i) => {
+  const embeds = await Promise.all(game.map(async (r, i) => {
     const kind = r.musicKind ? ` [${r.musicKind}]` : "";
-    const musicIdMatch = r.jacketUrl?.match(/\/img\/Music\/([^.]+)\.png/);
-    const jacketSrc = musicIdMatch ? `${server}/jacket?id=${musicIdMatch[1]}` : null;
     const rankStr = [r.fc, r.sync].filter(Boolean).join(" · ");
-    const desc = `\`${r.diff} ${r.level}\`` + (rankStr ? `  ·  \`${rankStr}\`` : "");
+    const constant = getConstant(r.title, r.musicKind, r.diff);
+    const lv = constant !== null ? constant.toFixed(1) : r.level;
+    const desc = `\`${r.diff} ${lv}\`` + (rankStr ? `  ·  \`${rankStr}\`` : "");
     const emb = new EmbedBuilder()
       .setColor(0x2b2d31)
       .setAuthor({ name: sep("#" + (i + 1), 34) })
@@ -136,9 +161,14 @@ export function recentEmbeds(
         { name: "달성률", value: r.achievement, inline: true },
         { name: "플레이일", value: r.date || "-", inline: true },
       );
-    if (jacketSrc) emb.setThumbnail(jacketSrc);
+    const buf = await jacketBuffer(r);
+    if (buf) {
+      const name = `jacket${i}.png`;
+      files.push(new AttachmentBuilder(buf, { name }));
+      emb.setThumbnail(`attachment://${name}`);
+    }
     return emb;
-  });
+  }));
 
   const prevBtn = new ButtonBuilder()
     .setCustomId(`page:${userId}:${idx - 1}`)
@@ -167,16 +197,26 @@ export function recentEmbeds(
     ),
   );
 
-  return { embeds, components: [navRow, shareRow] };
+  return { embeds, components: [navRow, shareRow], files };
 }
 
-const TOP_PAGE_SIZE = 5;
+const DIFF_ABBR: Record<string, string> = {
+  BASIC: "BAS", ADVANCED: "ADV", EXPERT: "EXP", MASTER: "MAS", "Re:MASTER": "ReM",
+};
 
-export function rtEmbeds(
+function formatRtRow(r: PlayRecord, rank: number): string {
+  const rankStr = String(rank).padStart(2);
+  const diff = DIFF_ABBR[r.diff] ?? "???";
+  const kind = (r.musicKind || "  ").padEnd(2);
+  const constant = getConstant(r.title, r.musicKind, r.diff);
+  const lv = (constant !== null ? constant.toFixed(1) : r.level).padEnd(4);
+  const ach = (r.achievementVal > 0 ? r.achievementVal.toFixed(4) + "%" : r.achievement).padStart(9);
+  const title = truncateVisual(r.title, 20);
+  return `${rankStr} ${diff} ${kind} ${lv} ${ach}  ${title}`;
+}
+
+export function rtTableEmbed(
   p: NonNullable<ReturnType<typeof getCachedProfile>>,
-  userId: string,
-  port: number,
-  pageIdx: number,
 ): { embeds: EmbedBuilder[]; components: ActionRowBuilder<ButtonBuilder>[] } {
   const records = getTopList(p);
 
@@ -187,63 +227,40 @@ export function rtEmbeds(
     };
   }
 
-  const totalPages = Math.ceil(records.length / TOP_PAGE_SIZE);
-  const idx = Math.max(0, Math.min(pageIdx, totalPages - 1));
-  const start = idx * TOP_PAGE_SIZE;
-  const page = records.slice(start, start + TOP_PAGE_SIZE);
-  const server = getBaseUrl(port);
+  const newRecords = records.slice(0, 15);
+  const otherRecords = records.slice(15, 50);
+  const header = " # Dif Kd Lv       Score    Title\n";
 
-  const embeds = page.map((r, i) => {
-    const rank = start + i + 1;
-    const kind = r.musicKind ? ` [${r.musicKind}]` : "";
-    const musicIdMatch = r.jacketUrl?.match(/\/img\/Music\/([^.]+)\.png/);
-    const jacketSrc = musicIdMatch ? `${server}/jacket?id=${musicIdMatch[1]}` : null;
-    const rankStr = [r.fc, r.sync].filter(Boolean).join(" · ");
-    const desc = `\`${r.diff} ${r.level}\`` + (rankStr ? `  ·  \`${rankStr}\`` : "");
-    const emb = new EmbedBuilder()
-      .setColor(0x2b2d31)
-      .setAuthor({ name: sep(`#${rank}`, 34) })
-      .setTitle(truncateVisual(r.title, 26) + kind)
-      .setDescription(desc)
-      .addFields({ name: "달성률", value: r.achievement, inline: true });
-    if (jacketSrc) emb.setThumbnail(jacketSrc);
-    return emb;
-  });
+  const SEP = "─".repeat(43);
+  const buildRows = (recs: PlayRecord[], startRank: number) =>
+    recs.flatMap((r, i) =>
+      i > 0 && i % 5 === 0
+        ? [SEP, formatRtRow(r, startRank + i)]
+        : [formatRtRow(r, startRank + i)],
+    );
 
-  const prevBtn = new ButtonBuilder()
-    .setCustomId(`rtpage:${userId}:${idx - 1}`)
-    .setLabel("◀ 이전")
-    .setStyle(ButtonStyle.Secondary)
-    .setDisabled(idx === 0);
-  const countBtn = new ButtonBuilder()
-    .setCustomId("rtpage_noop")
-    .setLabel(`${idx + 1} / ${totalPages}`)
-    .setStyle(ButtonStyle.Primary)
-    .setDisabled(true);
-  const nextBtn = new ButtonBuilder()
-    .setCustomId(`rtpage:${userId}:${idx + 1}`)
-    .setLabel("다음 ▶")
-    .setStyle(ButtonStyle.Secondary)
-    .setDisabled(idx === totalPages - 1);
+  const newBlock = "```\n" + header + buildRows(newRecords, 1).join("\n") + "\n```";
+  const otherBlock = "```\n" + header + buildRows(otherRecords, 1).join("\n") + "\n```";
 
-  const navRow = new ActionRowBuilder<ButtonBuilder>().addComponents(prevBtn, countBtn, nextBtn);
+  const desc =
+    `**신곡 NEW · ${newRecords.length}곡**\n${newBlock}\n` +
+    `**구곡 OTHERS · ${otherRecords.length}곡**\n${otherBlock}`;
 
-  const shareRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    page.map((_, si) =>
-      new ButtonBuilder()
-        .setCustomId(`rtshare:${userId}:${idx}:${si}`)
-        .setLabel(`#${start + si + 1} 공유`)
-        .setStyle(ButtonStyle.Success),
-    ),
-  );
-
-  return { embeds, components: [navRow, shareRow] };
+  return {
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0x2b2d31)
+        .setAuthor({ name: sep("레이팅 대상곡") })
+        .setDescription(desc)
+        .setFooter({ text: `총 ${newRecords.length + otherRecords.length}곡` }),
+    ],
+    components: [],
+  };
 }
 
 export function buildProfileReply(
   cached: NonNullable<ReturnType<typeof getCachedProfile>>,
   userId: string,
-  port: number,
 ) {
   const avatar = buildAvatarAttachment(userId);
   const recentBtn = new ButtonBuilder()

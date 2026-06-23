@@ -12,5 +12,7 @@ avatar_*.png
 avatar_*.jpg
 avatar.png
 scripts/gen-avatar.mjs
+scripts/test-card.ts
+fonts/
 data/
 .omo/
