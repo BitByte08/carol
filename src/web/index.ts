@@ -267,7 +267,7 @@ a{color:#c084fc}
 
         const recentRecords = parseRecentRecords(recordHtml);
         const clearHtmls = [top4Html, top3Html, top2Html, top1Html, top0Html].filter((h) => h);
-        const clearRecords = clearHtmls.length > 0 ? mergeTopRecords(clearHtmls.map((h) => parseTopSongs(h))) : [];
+        const clearRecords = clearHtmls.length > 0 ? mergeTopRecords(clearHtmls.map((h) => parseMusicScore(h))) : [];
         const topRecords = ratingTargetHtml ? parseMusicScore(ratingTargetHtml) : parseTop5(recordHtml);
         console.log(`[web] recentRecords: ${recentRecords.length} songs, top: ${topRecords.length} (rating target), clear: ${clearRecords.length}`);
 
