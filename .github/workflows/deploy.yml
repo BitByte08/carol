@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BASE: mymai
+  IMAGE_BASE: carol
 
 jobs:
   build-and-push:
