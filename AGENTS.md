@@ -127,7 +127,7 @@ See `docs/DESIGN.md` for the full design token reference. All web UI in `src/web
 
 ## Discord Commands
 
-All slash command names are Korean (`/프로필`, `/북마클릿`, `/검색`, `/레이팅기준표`, `/레이팅표`). The `설정` command handles a guild-level auto-role toggle. `/검색` searches the user's stored clear records by case-insensitive title substring (paginated 5 per page, with jacket thumbnails). Commands are registered globally unless `guildId` is set in config (guild-scope = instant update, useful for dev).
+All slash command names are Korean (`/프로필`, `/북마클릿`, `/검색`, `/레이팅기준표`, `/레이팅표`). The `설정` command handles a guild-level auto-role toggle. `/검색` searches the user's stored clear records by case-insensitive title substring. Each result embed shows all 5 difficulties (BASIC/ADV/EXP/MAS/ReM) with per-diff achievement, fc/sync rank, and the song's best score. Paginated 5 songs per page, with jacket thumbnails. Commands are registered globally unless `guildId` is set in config (guild-scope = instant update, useful for dev).
 
 ## Docker & Deployment
 
