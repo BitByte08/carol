@@ -1,4 +1,4 @@
-# 🎵 mymai
+# 🎵 carol
 
 **maimai DX NET** 프로필을 Discord에서 확인하는 봇입니다.
 
@@ -37,8 +37,8 @@ Discord → /프로필 → 북마클릿 코드 받음
 ## 빠른 시작
 
 ```bash
-git clone https://github.com/BitByte08/mymai.git
-cd mymai
+git clone https://github.com/BitByte08/carol.git
+cd carol
 npm install
 cp config.json.example config.json
 # config.json 편집 (token, clientId 입력)
@@ -77,8 +77,8 @@ npm start
 
 ```bash
 # VM에서
-git clone https://github.com/BitByte08/mymai.git
-cd mymai
+git clone https://github.com/BitByte08/carol.git
+cd carol
 # config.json, .env (CF_TUNNEL_TOKEN) 생성
 docker compose pull
 docker compose up -d

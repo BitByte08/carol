@@ -1,4 +1,4 @@
-# AGENTS.md — mymai
+# AGENTS.md — carol
 
 Discord bot that exposes maimai DX NET profiles via a bookmarklet. No SEGA credentials stored; users push HTML from their own browser session.
 
@@ -132,7 +132,7 @@ All slash command names are Korean (`/프로필`, `/북마클릿`, `/레이팅�
 docker compose up -d   # runs bot + cloudflared tunnel
 
 # Production (GCP VM)
-cd ~/maimai
+cd ~/carol
 git pull origin master
 docker compose pull
 docker compose up -d
