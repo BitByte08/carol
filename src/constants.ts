@@ -1,3 +1,5 @@
+import { getConstantsCache, saveConstantsCache } from "./db";
+
 interface SongEntry {
   title: string;
   image_url?: string;
@@ -50,6 +52,19 @@ async function fetchSongs(url: string): Promise<SongEntry[]> {
 }
 
 export async function loadConstants(): Promise<void> {
+  const dbCache = getConstantsCache();
+  if (dbCache && Date.now() - dbCache.updatedAt < 24 * 60 * 60 * 1000) {
+    try {
+      const parsed = JSON.parse(dbCache.data) as { constants: [string, number][]; jackets: [string, string][] };
+      constantMap = new Map(parsed.constants);
+      jacketMap = new Map(parsed.jackets);
+      console.log(`[constants] DB 캐시 복원: 상수 ${constantMap.size}개, 자켓 ${jacketMap.size}개`);
+      return;
+    } catch (e) {
+      console.error("[constants] DB 캐시 파싱 실패, 네트워크 fetch 시도:", e);
+    }
+  }
+
   try {
     const intl = await fetchSongs(INTL_URL);
     constantMap = new Map();
@@ -61,15 +76,29 @@ export async function loadConstants(): Promise<void> {
     try {
       const jp = await fetchSongs(JP_URL);
       const before = constantMap.size;
-      ingest(jp); // 국제판에 없는 곡만 보충
+      ingest(jp);
       jpAdded = constantMap.size - before;
     } catch (e) {
       console.error("[constants] JP 보충 로드 실패:", e);
     }
 
     console.log(`[constants] 국제판 ${intl.length}곡 (상수 ${intlCount}개) + JP 보충 ${jpAdded}개, 자켓 ${jacketMap.size}개`);
+    saveConstantsCache(JSON.stringify({
+      constants: Array.from(constantMap.entries()),
+      jackets: Array.from(jacketMap.entries()),
+    }));
   } catch (e) {
     console.error("[constants] 로드 실패:", e);
+    if (dbCache) {
+      try {
+        const parsed = JSON.parse(dbCache.data) as { constants: [string, number][]; jackets: [string, string][] };
+        constantMap = new Map(parsed.constants);
+        jacketMap = new Map(parsed.jackets);
+        console.log(`[constants] 네트워크 실패, 오래된 DB 캐시 사용: 상수 ${constantMap.size}개`);
+      } catch (e2) {
+        console.error("[constants] DB 캐시 파싱도 실패:", e2);
+      }
+    }
   }
 }
 

@@ -3,7 +3,7 @@ import {
   MessageFlags, PermissionsBitField, ActionRowBuilder, ButtonBuilder,
   ButtonStyle, ButtonInteraction,
 } from "discord.js";
-import { getGuildSetting, setGuildSetting } from "../db";
+import { getGuildSetting, setGuildSetting } from "../../db";
 
 export const data = new SlashCommandBuilder()
   .setName("설정")

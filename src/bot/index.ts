@@ -1,12 +1,12 @@
 import { Client, Events, GatewayIntentBits, ChatInputCommandInteraction, ButtonInteraction, REST, Routes } from "discord.js";
-import { initEncryption } from "./crypto";
-import { startWebServer, setBaseUrl } from "./web";
-import { closeDb, loadUserSession, getCachedProfile } from "./db";
-import { CONFIG, PORT } from "./config";
+import { initEncryption } from "../crypto";
+import { startWebServer, setBaseUrl } from "../web";
+import { closeDb, loadUserSession, getCachedProfile } from "../db";
+import { CONFIG, PORT } from "../config";
 import { recentEmbeds, rtTableEmbed } from "./utils/embeds";
 
-import { loadConstants } from "./constants";
-import { loadFonts } from "./fonts";
+import { loadConstants } from "../constants";
+import { loadFonts } from "../fonts";
 
 import * as profile      from "./commands/profile";
 import * as bookmarklet  from "./commands/bookmarklet";

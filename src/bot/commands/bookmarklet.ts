@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, MessageFlags, ButtonBuilder, ButtonStyle, ActionRowBuilder } from "discord.js";
-import { getUserSyncToken } from "../db";
-import { getBaseUrl } from "../web";
-import { PORT } from "../config";
+import { getUserSyncToken } from "../../db";
+import { getBaseUrl } from "../../web";
+import { PORT } from "../../config";
 
 export const data = new SlashCommandBuilder()
   .setName("북마클릿")

@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, AttachmentBuilder } from "discord.js";
-import { getCachedProfile, getUserFriendCode, getAvatarBlob } from "../db";
+import { getCachedProfile, getUserFriendCode, getAvatarBlob } from "../../db";
 import { getTopList } from "../utils/embeds";
 import { renderRatingCard } from "../utils/ratingCard";
 

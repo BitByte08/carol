@@ -2,11 +2,11 @@
   "name": "mymai",
   "version": "0.1.0",
   "description": "maimai DX net profile Discord bot",
-  "main": "dist/bot.js",
+  "main": "dist/bot/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/bot.js",
-    "dev": "ts-node src/bot.ts"
+    "start": "node dist/bot/index.js",
+    "dev": "ts-node src/bot/index.ts"
   },
   "keywords": [],
   "author": "",

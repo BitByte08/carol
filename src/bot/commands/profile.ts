@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags } from "discord.js";
-import { getCachedProfile, getUserFriendCode } from "../db";
+import { getCachedProfile, getUserFriendCode } from "../../db";
 import { buildProfileReply } from "../utils/embeds";
 import { autoRole } from "../utils/roles";
 

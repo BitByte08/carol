@@ -76,10 +76,18 @@ db.exec(`
     data BLOB NOT NULL,
     created_at INTEGER DEFAULT (strftime('%s','now') * 1000)
   );
+
+  CREATE TABLE IF NOT EXISTS constants_cache (
+    key TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_at INTEGER DEFAULT 0
+  );
 `);
 
 try { db.exec("ALTER TABLE profiles ADD COLUMN top_json TEXT DEFAULT '[]'"); } catch (_) {}
 try { db.exec("ALTER TABLE profiles ADD COLUMN clear_json TEXT DEFAULT '[]'"); } catch (_) {}
+try { db.exec("ALTER TABLE profiles ADD COLUMN rating_card_blob BLOB DEFAULT NULL"); } catch (_) {}
+try { db.exec("ALTER TABLE profiles ADD COLUMN rating_card_synced_at INTEGER DEFAULT 0"); } catch (_) {}
 
 // ─── Queries ────────────────────────────────────────────────────────────
 const stmtGet = db.prepare("SELECT friend_code AS friendCode, player_name AS playerName, rating, rating_max AS ratingMax, trophy, trophy_class AS trophyClass, avatar, grade_img AS gradeImg, stars, comment, play_count AS playCount, raw_html AS rawHtml, recent_json AS recentJson, top_json AS topJson, clear_json AS clearJson, last_synced_at AS lastSyncedAt FROM profiles WHERE friend_code = ?");
@@ -255,4 +263,25 @@ export function getGuildSetting(guildId: string): boolean {
 
 export function setGuildSetting(guildId: string, autoRole: boolean): void {
   db.prepare("INSERT OR REPLACE INTO guild_settings (guild_id, auto_role) VALUES (?, ?)").run(guildId, autoRole ? 1 : 0);
+}
+
+// ─── Rating card render cache ────────────────────────────────────────────
+export function getRatingCardCache(friendCode: string): { blob: Buffer; syncedAt: number } | null {
+  const row = db.prepare("SELECT rating_card_blob AS blob, rating_card_synced_at AS syncedAt FROM profiles WHERE friend_code = ?").get(friendCode) as { blob: Buffer | null; syncedAt: number } | undefined;
+  if (!row?.blob) return null;
+  return { blob: row.blob, syncedAt: row.syncedAt };
+}
+
+export function saveRatingCardCache(friendCode: string, data: Buffer, lastSyncedAt: number): void {
+  db.prepare("UPDATE profiles SET rating_card_blob = ?, rating_card_synced_at = ? WHERE friend_code = ?").run(data, lastSyncedAt, friendCode);
+}
+
+// ─── Song constants cache ────────────────────────────────────────────────
+export function getConstantsCache(): { data: string; updatedAt: number } | null {
+  const row = db.prepare("SELECT data, updated_at AS updatedAt FROM constants_cache WHERE key = 'main'").get() as { data: string; updatedAt: number } | undefined;
+  return row ?? null;
+}
+
+export function saveConstantsCache(data: string): void {
+  db.prepare("INSERT OR REPLACE INTO constants_cache (key, data, updated_at) VALUES ('main', ?, ?)").run(data, Date.now());
 }
