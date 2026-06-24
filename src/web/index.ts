@@ -260,7 +260,7 @@ a{color:#c084fc}
 
         // ─── Play count guard: skip if nothing changed ──────────────────────
         const existing = getCachedProfile(fc);
-        if (existing && existing.playCount === (playCount || 0)) {
+        if (existing && existing.playCount === (playCount || 0) && existing.clearJson !== "[]") {
           console.log(`[web] no_change: ${effective.playerName} playCount=${playCount}`);
           res.writeHead(200); res.end("no_change"); return;
         }
