@@ -1,10 +1,10 @@
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
-import type { PlayRecord } from "../scraper";
-import type { CachedProfile } from "../db";
-import { getSongJacket, saveSongJacket } from "../db";
-import { getConstant, levelToNumber, calcSongRating, getJacketFile } from "../constants";
-import { loadFonts } from "../fonts";
+import type { PlayRecord } from "../../scraper";
+import type { CachedProfile } from "../../db";
+import { getSongJacket, saveSongJacket, getRatingCardCache, saveRatingCardCache } from "../../db";
+import { getConstant, levelToNumber, calcSongRating, getJacketFile } from "../../constants";
+import { loadFonts } from "../../fonts";
 
 // ─── Design tokens (ported from mailog) ──────────────────────────────────
 const CARD_W = 110;
@@ -181,6 +181,12 @@ export async function renderRatingCard(
   records: PlayRecord[],
   avatarBuf: Buffer | null,
 ): Promise<Buffer> {
+  // ─── Render cache: return cached PNG if profile hasn't changed ───────────
+  const cached = getRatingCardCache(profile.friendCode);
+  if (cached && cached.syncedAt === profile.lastSyncedAt) {
+    return cached.blob;
+  }
+
   const fonts = await loadFonts();
 
   const newVms = records.slice(0, 15).map(toVM);
@@ -253,5 +259,10 @@ export async function renderRatingCard(
 
   const svg = await satori(root as any, { width: totalWidth, fonts: fonts as any });
   const png = new Resvg(svg, { fitTo: { mode: "width", value: totalWidth * 2 } }).render().asPng();
-  return Buffer.from(png);
+  const buf = Buffer.from(png);
+
+  // ─── Persist render cache ─────────────────────────────────────────────────
+  saveRatingCardCache(profile.friendCode, buf, profile.lastSyncedAt);
+
+  return buf;
 }
