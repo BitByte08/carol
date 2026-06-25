@@ -253,21 +253,19 @@ export async function searchResultEmbeds(
     const kind = all[0]?.musicKind ? ` [${all[0].musicKind}]` : "";
     const lines = DIFF_ORDER.map((d) => {
       const r = all.find((x) => x.diff === d);
-      if (!r) return `${d.padEnd(8)} ${"?".padStart(9)}  · -`;
-      const constant = getConstant(r.title, r.musicKind, r.diff);
-      const lv = constant !== null ? constant.toFixed(1) : r.level;
-      const ach = r.achievementVal > 0 ? r.achievementVal.toFixed(4) + "%" : "?";
-      const rank = [r.fc, r.sync].filter(Boolean).join("+") || "-";
-      return `${d.padEnd(8)} ${ach.padStart(9)}  · ${rank}`;
+      const constant = getConstant(title, all[0]?.musicKind, d);
+      const lv = constant !== null ? constant.toFixed(1) : (r?.level ?? "?");
+      const ach = r && r.achievementVal > 0 ? r.achievementVal.toFixed(4) + "%" : "?";
+      const fc = r?.fc || "-";
+      const sync = r?.sync || "-";
+      return `${d.padEnd(9)} ${ach.padStart(9)}  ${String(lv).padStart(4)}  ${fc.padStart(4)}  ${sync.padStart(4)}`;
     });
-    const best = all.reduce((m, r) => (r.achievementVal > m.achievementVal ? r : m), all[0]);
-    const bestText = best && best.achievementVal > 0 ? `최고: ${best.diff} ${best.achievementVal.toFixed(4)}%` : "미플레이";
     const buf = await jacketBuffer(all[0] ?? ({ title, diff: "BASIC", level: "?", date: "", jacketUrl: "", musicKind: "", achievementVal: 0, track: 0, fc: "", sync: "" } as PlayRecord));
     const emb = new EmbedBuilder()
       .setColor(0x2b2d31)
       .setAuthor({ name: sep("", 34) })
       .setTitle(truncateVisual(title, 26) + kind)
-      .setDescription("```\n" + lines.join("\n") + "\n```\n" + bestText);
+      .setDescription("```\n" + lines.join("\n") + "\n```");
     if (buf) {
       const name = `sjacket${i}.png`;
       files.push(new AttachmentBuilder(buf, { name }));
