@@ -260,16 +260,24 @@ a{color:#c084fc}
 
         // ─── Play count guard: skip if nothing changed ──────────────────────
         const existing = getCachedProfile(fc);
-        if (existing && existing.playCount === (playCount || 0) && existing.clearJson !== "[]") {
-          console.log(`[web] no_change: ${effective.playerName} playCount=${playCount}`);
-          res.writeHead(200); res.end("no_change"); return;
+        if (existing && existing.clearJson && existing.clearJson !== "[]") {
+          try {
+            const arr = JSON.parse(existing.clearJson);
+            if (Array.isArray(arr) && arr.every((r: any) => r.fc && r.fc !== "")) {
+              if (existing.playCount === (playCount || 0)) {
+                console.log(`[web] no_change: ${effective.playerName} playCount=${playCount}`);
+                res.writeHead(200); res.end("no_change"); return;
+              }
+            }
+          } catch { /* fall through to re-parse */ }
         }
 
         const recentRecords = parseRecentRecords(recordHtml);
         const clearHtmls = [top4Html, top3Html, top2Html, top1Html, top0Html].filter((h) => h);
         const clearRecords = clearHtmls.length > 0 ? mergeTopRecords(clearHtmls.map((h) => parseMusicScore(h))) : [];
         const topRecords = ratingTargetHtml ? parseMusicScore(ratingTargetHtml) : parseTop5(recordHtml);
-        console.log(`[web] recentRecords: ${recentRecords.length} songs, top: ${topRecords.length} (rating target), clear: ${clearRecords.length}`);
+        const emptyFc = clearRecords.filter((r) => !r.fc).length;
+        console.log(`[web] recentRecords: ${recentRecords.length} songs, top: ${topRecords.length} (rating target), clear: ${clearRecords.length} (empty fc: ${emptyFc})`);
 
         cacheProfile({
           playerName: effective.playerName || "???", rating: effective.rating || 0,

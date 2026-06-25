@@ -84,7 +84,7 @@ const SYNC_LABELS: Record<string, string> = {
 };
 
 function iconName(src: string): string {
-  const m = src.match(/playlog\/([^.?]+)/);
+  const m = src.match(/(?:playlog\/|music_icon_)([^.?/]+)/);
   return m ? m[1] : "";
 }
 
@@ -146,7 +146,8 @@ export function parseMusicScore(html: string): PlayRecord[] {
     if (!title) return;
     const level = block.find(".music_lv_block").text().trim();
     const achievement = block.find(".music_score_block").text().trim();
-    const diffImg = (block.find("img").first().attr("src") || "").split("/").pop() || "";
+    const allImgs = block.find("img");
+    const diffImg = (allImgs.eq(0).attr("src") || "").split("/").pop() || "";
     const diff = diffMap[diffImg] || "";
     const kindImg = (block.find(".music_kind_icon").attr("src") || "").split("/").pop() || "";
     const musicKind = kindImg.includes("_dx") ? "DX" : kindImg.includes("_standard") ? "ST" : "";
@@ -154,9 +155,11 @@ export function parseMusicScore(html: string): PlayRecord[] {
     const jacketUrl = musicId ? `https://maimaidx-eng.com/maimai-mobile/img/Music/${musicId}.png` : "";
     const achMatch = achievement.match(/(\d+\.\d+)/);
     const achievementVal = achMatch ? parseFloat(achMatch[1]) : 0;
+    const fc = FC_LABELS[iconName(allImgs.eq(1).attr("src") || "")] || "";
+    const sync = SYNC_LABELS[iconName(allImgs.eq(2).attr("src") || "")] || "";
     records.push({
       title, achievement, diff, level, jacketUrl, musicKind, achievementVal,
-      date: "", track: 0, fc: "", sync: "",
+      date: "", track: 0, fc, sync,
     });
   });
   return records;
