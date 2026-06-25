@@ -155,8 +155,16 @@ export function parseMusicScore(html: string): PlayRecord[] {
     const jacketUrl = musicId ? `https://maimaidx-eng.com/maimai-mobile/img/Music/${musicId}.png` : "";
     const achMatch = achievement.match(/(\d+\.\d+)/);
     const achievementVal = achMatch ? parseFloat(achMatch[1]) : 0;
-    const fc = FC_LABELS[iconName(allImgs.eq(1).attr("src") || "")] || "";
-    const sync = SYNC_LABELS[iconName(allImgs.eq(2).attr("src") || "")] || "";
+    let fc = "";
+    let sync = "";
+    allImgs.each((_, img) => {
+      const src = $(img).attr("src") || "";
+      if (!src.includes("music_icon_")) return;
+      const name = iconName(src);
+      if (!name) return;
+      if (!fc && FC_LABELS[name]) fc = FC_LABELS[name];
+      else if (!sync && SYNC_LABELS[name]) sync = SYNC_LABELS[name];
+    });
     records.push({
       title, achievement, diff, level, jacketUrl, musicKind, achievementVal,
       date: "", track: 0, fc, sync,
