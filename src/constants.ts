@@ -122,8 +122,7 @@ export function levelToNumber(level: string): number {
   return level.includes("+") ? base + 0.6 : base;
 }
 
-// 곡별 레이팅 점수 (maimai DX 공식, AP 보너스 제외)
-// achInt = 달성률 × 10000 (예: 100.5000% → 1005000)
+// 달성률 계수 (achInt = 달성률 × 10000, 예: 100.5000% → 1005000)
 function maimaiCoefficient(achInt: number): number {
   if (achInt >= 1005000) return 22.4; // SSS+
   if (achInt >= 1000000) return 21.6; // SSS
@@ -145,10 +144,12 @@ function maimaiCoefficient(achInt: number): number {
   return 0.0;
 }
 
-export function calcSongRating(achievementVal: number, level: number): number {
+// fc 마크가 AP/AP+면 곡별 레이팅에 +1 보너스 (maimai DX 공식)
+export function calcSongRating(achievementVal: number, level: number, fc?: string): number {
   const achInt = Math.round(achievementVal * 10000);
   const coeff = maimaiCoefficient(achInt);
   if (coeff === 0) return 0;
   const capped = Math.min(achInt, 1005000);
-  return Math.floor((level * capped / 1000000) * coeff);
+  const apBonus = fc === "AP" || fc === "AP+" ? 1 : 0;
+  return Math.floor((level * capped / 1000000) * coeff) + apBonus;
 }

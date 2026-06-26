@@ -188,12 +188,30 @@ export function parseTop5(html: string): PlayRecord[] {
   return Array.from(best.values()).sort((a, b) => b.achievementVal - a.achievementVal).slice(0, 5);
 }
 
+// 채보 식별 키: ST/DX는 같은 title+diff라도 별개 채보이므로 musicKind를 포함
+export function chartKey(r: Pick<PlayRecord, "title" | "musicKind" | "diff">): string {
+  return r.title + "|" + r.musicKind + "|" + r.diff;
+}
+
+// 채보별 마크(FC/AP, Sync) 조회 맵. 레이팅 대상 페이지엔 FC/AP·Sync 아이콘이 없어
+// clear 기록(clearJson)에서 AP 보너스 판정 및 카드 표시용 마크를 끌어오기 위해 사용.
+export interface ChartMarks {
+  fc: string;
+  sync: string;
+}
+export function buildMarkMap(records: PlayRecord[]): Map<string, ChartMarks> {
+  const m = new Map<string, ChartMarks>();
+  for (const r of records) {
+    if (r.fc || r.sync) m.set(chartKey(r), { fc: r.fc, sync: r.sync });
+  }
+  return m;
+}
+
 export function mergeTopRecords(recordsList: PlayRecord[][]): PlayRecord[] {
   const best = new Map<string, PlayRecord>();
   for (const records of recordsList) {
     for (const r of records) {
-      // ST/DX는 같은 title+diff라도 별개 채보이므로 musicKind를 키에 포함
-      const key = r.title + "|" + r.musicKind + "|" + r.diff;
+      const key = chartKey(r);
       const existing = best.get(key);
       if (!existing || r.achievementVal > existing.achievementVal) best.set(key, r);
     }

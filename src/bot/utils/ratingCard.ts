@@ -1,6 +1,7 @@
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
-import type { PlayRecord } from "../../scraper";
+import type { PlayRecord, ChartMarks } from "../../scraper";
+import { buildMarkMap, chartKey } from "../../scraper";
 import type { CachedProfile } from "../../db";
 import { getSongJacket, saveSongJacket, getRatingCardCache, saveRatingCardCache } from "../../db";
 import { getConstant, levelToNumber, calcSongRating, getJacketFile } from "../../constants";
@@ -11,6 +12,8 @@ const CARD_W = 110;
 const CARD_H = 115;
 const GAP = 4;
 const ACCENT = "#9333ea";
+// 카드 레이아웃/계산이 바뀌면 올린다 → 기존 렌더 캐시가 자동 무효화됨
+const CARD_VERSION = 2;
 
 const MAI_DIFF_COLOR: Record<string, string> = {
   BASIC: "#16a34a",
@@ -61,13 +64,17 @@ interface CardVM {
   diff: string;
   diffColor: string;
   isDx: boolean;
+  fc: string;
   jacketFile: string | null;
 }
 
-function toVM(r: PlayRecord): CardVM {
+function toVM(r: PlayRecord, markMap?: Map<string, ChartMarks>): CardVM {
   const constant = getConstant(r.title, r.musicKind, r.diff);
   const lvNum = constant !== null ? constant : levelToNumber(r.level);
-  const rs = calcSongRating(r.achievementVal, lvNum);
+  // 레이팅 대상 페이지엔 FC/AP·Sync 아이콘이 없어 clear 기록의 마크를 우선 사용
+  const marks = markMap?.get(chartKey(r));
+  const fc = marks?.fc ?? r.fc;
+  const rs = calcSongRating(r.achievementVal, lvNum, fc);
   return {
     title: r.title,
     ach: r.achievementVal > 0 ? r.achievementVal.toFixed(4) + "%" : r.achievement,
@@ -77,6 +84,7 @@ function toVM(r: PlayRecord): CardVM {
     diff: r.diff,
     diffColor: MAI_DIFF_COLOR[r.diff] ?? "#888",
     isDx: r.musicKind === "DX",
+    fc,
     jacketFile: getJacketFile(r.title),
   };
 }
@@ -135,9 +143,13 @@ function jacketCard(vm: CardVM, rank: number, jacketUrl: string | null): El {
     width: "100%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
   }, vm.title));
 
+  // 하단: 좌측 난이도 · 우측 [콤보마크(AP/FC) + 스코어랭크] (mailog 다운로드 카드와 동일 배치)
+  const rightMarks: El[] = [];
+  if (vm.fc) rightMarks.push(el("span", { fontSize: 7, fontWeight: 700, color: MAI_CM_COLOR[vm.fc] ?? "rgba(255,255,255,0.65)" }, vm.fc));
+  rightMarks.push(el("span", { fontSize: 7, fontWeight: 700, color: MAI_CM_COLOR[vm.rank] ?? "rgba(255,255,255,0.65)" }, vm.rank));
   infoRows.push(el("div", { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }, [
     el("span", { fontSize: 7, fontWeight: 700, color: vm.diffColor }, vm.diff),
-    el("span", { fontSize: 7, fontWeight: 700, color: MAI_CM_COLOR[vm.rank] ?? "rgba(255,255,255,0.65)" }, vm.rank),
+    el("div", { display: "flex", gap: 3, alignItems: "center" }, rightMarks),
   ]));
 
   layers.push(el("div", {
@@ -181,17 +193,25 @@ export async function renderRatingCard(
   records: PlayRecord[],
   avatarBuf: Buffer | null,
 ): Promise<Buffer> {
-  // ─── Render cache: return cached PNG if profile hasn't changed ───────────
+  // ─── Render cache: return cached PNG if profile and card version unchanged ─
   const cached = getRatingCardCache(profile.friendCode);
-  if (cached && cached.syncedAt === profile.lastSyncedAt) {
+  if (cached && cached.syncedAt === profile.lastSyncedAt && cached.version === CARD_VERSION) {
     return cached.blob;
   }
 
   const fonts = await loadFonts();
 
-  const newVms = records.slice(0, 15).map(toVM);
-  const otherVms = records.slice(15, 50).map(toVM);
-  // 헤더에는 프로필에 저장된 실제 레이팅을 표시 (곡별 합산값은 AP 미반영 추정치라 부정확)
+  // 레이팅 대상 페이지엔 FC/AP·Sync 마크가 없어 clear 기록에서 마크를 끌어옴
+  let clearRecords: PlayRecord[] = [];
+  try {
+    const parsed = JSON.parse(profile.clearJson || "[]");
+    if (Array.isArray(parsed)) clearRecords = parsed;
+  } catch { /* ignore */ }
+  const markMap = buildMarkMap(clearRecords);
+
+  const newVms = records.slice(0, 15).map((r) => toVM(r, markMap));
+  const otherVms = records.slice(15, 50).map((r) => toVM(r, markMap));
+  // 헤더에는 프로필에 저장된 실제 레이팅을 표시
   const totalRs = profile.rating || newVms.concat(otherVms).reduce((s, v) => s + v.rs, 0);
 
   // prefetch all jacket images
@@ -262,7 +282,7 @@ export async function renderRatingCard(
   const buf = Buffer.from(png);
 
   // ─── Persist render cache ─────────────────────────────────────────────────
-  saveRatingCardCache(profile.friendCode, buf, profile.lastSyncedAt);
+  saveRatingCardCache(profile.friendCode, buf, profile.lastSyncedAt, CARD_VERSION);
 
   return buf;
 }

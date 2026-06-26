@@ -31,7 +31,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   try {
     const png = await renderRatingCard(cached, records, getAvatarBlob(userId));
     await interaction.editReply({
-      content: "-# ※ 곡별 점수는 AP 보너스 미반영 추정치로 실제 레이팅과 다를 수 있습니다",
       files: [new AttachmentBuilder(png, { name: "rating.png" })],
     });
   } catch (e) {

@@ -19,7 +19,8 @@ import {
 } from "../../constants";
 import { aliasMatches, normalizeQuery } from "../../aliases";
 import { ratingColor } from "./roles";
-import type { PlayRecord } from "../../scraper";
+import { buildMarkMap, chartKey } from "../../scraper";
+import type { PlayRecord, ChartMarks } from "../../scraper";
 
 // 곡 자켓 버퍼: DB 캐시 → maimai net(musicId) → otoge-db(title) 순으로 확보하고 캐시
 export async function jacketBuffer(r: PlayRecord): Promise<Buffer | null> {
@@ -107,10 +108,11 @@ function truncateVisual(s: string, maxWidth: number): string {
 }
 
 // 곡별 레이팅 점수 (상수 → 정수 상수, 없으면 레벨 근사)
-function songRating(r: PlayRecord): number {
+// fc: AP 보너스 판정용 마크. 미지정 시 레코드 자체의 r.fc 사용.
+function songRating(r: PlayRecord, fc?: string): number {
   const constant = getConstant(r.title, r.musicKind, r.diff);
   const lvNum = constant !== null ? constant : levelToNumber(r.level);
-  return calcSongRating(r.achievementVal, lvNum);
+  return calcSongRating(r.achievementVal, lvNum, fc ?? r.fc);
 }
 
 export function buildAvatarAttachment(
@@ -282,7 +284,7 @@ export async function searchResultEmbeds(
     // 곡명 또는 별명(NeonDB)에 부분 일치
     if (!normalizeQuery(r.title).includes(q) && !aliasMatches(r.title, q))
       continue;
-    const key = `${r.title} ${r.musicKind || ""}`;
+    const key = `${r.musicKind || ""}|${r.title}`;
     const arr = byChart.get(key) ?? [];
     arr.push(r);
     byChart.set(key, arr);
@@ -416,7 +418,11 @@ const DIFF_ABBR: Record<string, string> = {
 // RS를 곡명 앞에 둠: 곡명(가변 폭, CJK 포함)을 마지막에 두어야 정렬이 깨지지 않음
 const RT_HEADER = " # Dif Kd Lv      Score   RS  Title";
 
-function formatRtRow(r: PlayRecord, rank: number): string {
+function formatRtRow(
+  r: PlayRecord,
+  rank: number,
+  markMap?: Map<string, ChartMarks>,
+): string {
   const rankStr = String(rank).padStart(2);
   const diff = DIFF_ABBR[r.diff] ?? "???";
   const kind = (r.musicKind || "  ").padEnd(2);
@@ -425,7 +431,7 @@ function formatRtRow(r: PlayRecord, rank: number): string {
   const ach = (
     r.achievementVal > 0 ? r.achievementVal.toFixed(4) + "%" : r.achievement
   ).padStart(9);
-  const rs = String(songRating(r)).padStart(3);
+  const rs = String(songRating(r, markMap?.get(chartKey(r))?.fc)).padStart(3);
   const title = truncateVisual(r.title, 26);
   return `${rankStr} ${diff} ${kind} ${lv} ${ach}  ${rs}  ${title}`;
 }
@@ -451,8 +457,10 @@ export function rtTableEmbed(
   const newRecords = records.slice(0, 15);
   const otherRecords = records.slice(15, 50);
 
-  const newRows = newRecords.map((r, i) => formatRtRow(r, i + 1));
-  const otherRows = otherRecords.map((r, i) => formatRtRow(r, i + 1));
+  // 레이팅 대상 페이지엔 FC/AP 마크가 없어 clear 기록에서 AP 보너스용 마크를 끌어옴
+  const markMap = buildMarkMap(getClearList(p));
+  const newRows = newRecords.map((r, i) => formatRtRow(r, i + 1, markMap));
+  const otherRows = otherRecords.map((r, i) => formatRtRow(r, i + 1, markMap));
 
   // 구분선 길이를 가장 긴 행(보통 ASCII 곡명)에 맞춰 표 너비와 일치시킴
   const maxW = Math.max(
@@ -480,7 +488,7 @@ export function rtTableEmbed(
         .setAuthor({ name: sep("레이팅 대상곡") })
         .setDescription(desc)
         .setFooter({
-          text: `총 ${newRecords.length + otherRecords.length}곡  ·  RS=곡별 레이팅 점수 (AP 보너스 미반영, 실제와 다를 수 있음)`,
+          text: `총 ${newRecords.length + otherRecords.length}곡  ·  RS=곡별 레이팅 점수`,
         }),
     ],
     components: [],
