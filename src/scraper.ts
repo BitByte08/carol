@@ -150,8 +150,12 @@ export function parseMusicScore(html: string): PlayRecord[] {
     const allImgs = block.find("img");
     const diffImg = (allImgs.eq(0).attr("src") || "").split("/").pop() || "";
     const diff = diffMap[diffImg] || "";
-    // .music_kind_icon은 _score_back 블록의 형제(부모 .w_450 래퍼의 자식)이므로 parent에서 탐색
-    const kindImg = (block.parent().find(".music_kind_icon").attr("src") || "").split("/").pop() || "";
+    // .music_kind_icon 위치가 페이지마다 다름: 레이팅 대상 페이지는 블록 내부(form 안),
+    // musicGenre(클리어 리스트) 페이지는 블록의 형제. 내부 → 형제 순으로 탐색.
+    let kindEl = block.find(".music_kind_icon").first();
+    if (!kindEl.length) kindEl = block.nextAll(".music_kind_icon").first();
+    if (!kindEl.length) kindEl = block.prevAll(".music_kind_icon").first();
+    const kindImg = (kindEl.attr("src") || "").split("/").pop() || "";
     const musicKind = kindImg.includes("_dx") ? "DX" : kindImg.includes("_standard") ? "ST" : "";
     const musicId = block.find("input[name='idx']").val() as string | undefined;
     const jacketUrl = musicId ? `https://maimaidx-eng.com/maimai-mobile/img/Music/${musicId}.png` : "";
@@ -205,6 +209,30 @@ export function buildMarkMap(records: PlayRecord[]): Map<string, ChartMarks> {
     if (r.fc || r.sync) m.set(chartKey(r), { fc: r.fc, sync: r.sync });
   }
   return m;
+}
+
+// clearJson 기준으로 레코드의 ST/DX를 보정하는 함수를 만든다.
+// 레이팅 대상 페이지는 musicKind 추출이 부정확할 수 있어, 정확한 clear 기록에서
+// title+diff로 찾아 보정한다. 같은 title+diff에 ST/DX 둘 다 있으면 달성률로 구분.
+export function buildKindResolver(clearRecords: PlayRecord[]): (r: PlayRecord) => string {
+  const kindsByTitleDiff = new Map<string, Set<string>>();
+  const kindByExact = new Map<string, string>(); // title|diff|achInt -> kind
+  for (const r of clearRecords) {
+    if (!r.musicKind) continue;
+    const td = r.title + "|" + r.diff;
+    let set = kindsByTitleDiff.get(td);
+    if (!set) { set = new Set(); kindsByTitleDiff.set(td, set); }
+    set.add(r.musicKind);
+    kindByExact.set(td + "|" + Math.round(r.achievementVal * 10000), r.musicKind);
+  }
+  return (r: PlayRecord): string => {
+    const td = r.title + "|" + r.diff;
+    const kinds = kindsByTitleDiff.get(td);
+    if (!kinds || kinds.size === 0) return r.musicKind;
+    if (kinds.size === 1) return [...kinds][0];
+    // ST/DX 둘 다 존재 → 달성률로 정확한 채보 판별
+    return kindByExact.get(td + "|" + Math.round(r.achievementVal * 10000)) ?? r.musicKind;
+  };
 }
 
 export function mergeTopRecords(recordsList: PlayRecord[][]): PlayRecord[] {
