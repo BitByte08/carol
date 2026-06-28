@@ -89,8 +89,8 @@ try { db.exec("ALTER TABLE profiles ADD COLUMN clear_json TEXT DEFAULT '[]'"); }
 try { db.exec("ALTER TABLE profiles ADD COLUMN rating_card_blob BLOB DEFAULT NULL"); } catch (_) {}
 try { db.exec("ALTER TABLE profiles ADD COLUMN rating_card_synced_at INTEGER DEFAULT 0"); } catch (_) {}
 try { db.exec("ALTER TABLE profiles ADD COLUMN rating_card_version INTEGER DEFAULT 0"); } catch (_) {}
-// 프로필 비공개 여부 (기본 1=비공개). 기존 유저도 비공개로 마이그레이션됨.
 try { db.exec("ALTER TABLE sessions ADD COLUMN profile_private INTEGER DEFAULT 1"); } catch (_) {}
+try { db.exec("ALTER TABLE sessions ADD COLUMN extra_bookmarklets TEXT DEFAULT '[]'"); } catch (_) {}
 
 // ─── Queries ────────────────────────────────────────────────────────────
 const stmtGet = db.prepare("SELECT friend_code AS friendCode, player_name AS playerName, rating, rating_max AS ratingMax, trophy, trophy_class AS trophyClass, avatar, grade_img AS gradeImg, stars, comment, play_count AS playCount, raw_html AS rawHtml, recent_json AS recentJson, top_json AS topJson, clear_json AS clearJson, last_synced_at AS lastSyncedAt FROM profiles WHERE friend_code = ?");
@@ -300,6 +300,49 @@ export function getConstantsCache(): { data: string; updatedAt: number } | null 
 
 export function saveConstantsCache(data: string): void {
   db.prepare("INSERT OR REPLACE INTO constants_cache (key, data, updated_at) VALUES ('main', ?, ?)").run(data, Date.now());
+}
+
+// ─── Extra bookmarklets per user ────────────────────────────────────────
+export interface ExtraBookmarklet {
+  label: string;
+  code: string;
+}
+
+export function getExtraBookmarklets(discordUserId: string): ExtraBookmarklet[] {
+  const row = db.prepare("SELECT extra_bookmarklets FROM sessions WHERE discord_user_id = ?").get(discordUserId) as { extra_bookmarklets: string } | undefined;
+  if (!row?.extra_bookmarklets) return [];
+  try { return JSON.parse(row.extra_bookmarklets) as ExtraBookmarklet[]; } catch { return []; }
+}
+
+export function addExtraBookmarklet(discordUserId: string, label: string, code: string): void {
+  const existing = getExtraBookmarklets(discordUserId);
+  const filtered = existing.filter((b) => b.label !== label);
+  filtered.push({ label, code });
+  const json = JSON.stringify(filtered);
+  db.prepare(`
+    INSERT INTO sessions (discord_user_id, cookie_json, extra_bookmarklets, updated_at)
+    VALUES (?, '{}', ?, ?)
+    ON CONFLICT(discord_user_id) DO UPDATE SET extra_bookmarklets = excluded.extra_bookmarklets
+  `).run(discordUserId, json, Date.now());
+}
+
+export function removeExtraBookmarklet(discordUserId: string, label: string): boolean {
+  const existing = getExtraBookmarklets(discordUserId);
+  const filtered = existing.filter((b) => b.label !== label);
+  if (filtered.length === existing.length) return false;
+  db.prepare("UPDATE sessions SET extra_bookmarklets = ? WHERE discord_user_id = ?").run(JSON.stringify(filtered), discordUserId);
+  return true;
+}
+
+// ─── Status helpers ──────────────────────────────────────────────────────
+export function getRegisteredUserCount(): number {
+  const row = db.prepare("SELECT COUNT(*) AS cnt FROM sessions WHERE friend_code != ''").get() as { cnt: number };
+  return row.cnt;
+}
+
+export function getLastSyncTime(): number | null {
+  const row = db.prepare("SELECT MAX(last_synced_at) AS t FROM profiles").get() as { t: number | null };
+  return row.t ?? null;
 }
 
 // ─── rating_card_blob GC ─────────────────────────────────────────────────
