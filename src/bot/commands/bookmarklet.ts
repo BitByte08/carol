@@ -15,40 +15,32 @@ const MAX_EXTRAS = 5;
 
 export const data = new SlashCommandBuilder()
   .setName("북마클릿")
-  .setDescription("프로필 동기화용 북마클릿 관리")
-  .addSubcommand((sub) =>
-    sub.setName("설치").setDescription("북마클릿 설치 가이드 링크"),
-  )
-  .addSubcommand((sub) =>
-    sub
-      .setName("추가")
-      .setDescription("메인 북마클릿 실행 시 함께 실행할 추가 북마클릿 등록")
-      .addStringOption((o) =>
-        o.setName("이름").setDescription("북마클릿 표시 이름").setRequired(true),
-      )
-      .addStringOption((o) =>
-        o
-          .setName("코드")
-          .setDescription("북마클릿 코드 (javascript: 로 시작해야 함)")
-          .setRequired(true),
+  .setDescription("프로필 동기화용 북마클릿 관리 (옵션 없이 실행 시 설치 가이드)")
+  .addStringOption((o) =>
+    o
+      .setName("action")
+      .setDescription("수행할 작업")
+      .setRequired(false)
+      .addChoices(
+        { name: "추가 — 추가 북마클릿 등록", value: "추가" },
+        { name: "목록 — 등록된 북마클릿 확인", value: "목록" },
+        { name: "삭제 — 북마클릿 삭제", value: "삭제" },
       ),
   )
-  .addSubcommand((sub) =>
-    sub.setName("목록").setDescription("등록된 추가 북마클릿 목록 확인"),
+  .addStringOption((o) =>
+    o.setName("이름").setDescription("북마클릿 이름").setRequired(false),
   )
-  .addSubcommand((sub) =>
-    sub
-      .setName("삭제")
-      .setDescription("등록된 추가 북마클릿 삭제")
-      .addStringOption((o) =>
-        o.setName("이름").setDescription("삭제할 북마클릿 이름").setRequired(true),
-      ),
+  .addStringOption((o) =>
+    o
+      .setName("코드")
+      .setDescription("북마클릿 코드 (javascript: 로 시작, 추가 시 필요)")
+      .setRequired(false),
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const sub = interaction.options.getSubcommand();
+  const action = interaction.options.getString("action") ?? "설치";
 
-  if (sub === "설치") {
+  if (action === "설치") {
     const token = getUserSyncToken(interaction.user.id);
     const guideUrl = `${getBaseUrl(PORT)}/sync?code=${token}`;
     const btn = new ButtonBuilder()
@@ -74,9 +66,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  if (sub === "추가") {
-    const label = interaction.options.getString("이름", true).trim();
-    const code = interaction.options.getString("코드", true).trim();
+  if (action === "추가") {
+    const label = (interaction.options.getString("이름") ?? "").trim();
+    const code = (interaction.options.getString("코드") ?? "").trim();
+
+    if (!label || !code) {
+      await interaction.reply({
+        embeds: [new EmbedBuilder().setColor(0xff4444).setDescription("❌ `이름`과 `코드` 옵션을 모두 입력해주세요.")],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
 
     if (!code.startsWith("javascript:")) {
       await interaction.reply({
@@ -116,7 +116,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  if (sub === "목록") {
+  if (action === "목록") {
     const extras = getExtraBookmarklets(interaction.user.id);
     if (extras.length === 0) {
       await interaction.reply({
@@ -142,8 +142,15 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  if (sub === "삭제") {
-    const label = interaction.options.getString("이름", true).trim();
+  if (action === "삭제") {
+    const label = (interaction.options.getString("이름") ?? "").trim();
+    if (!label) {
+      await interaction.reply({
+        embeds: [new EmbedBuilder().setColor(0xff4444).setDescription("❌ 삭제할 북마클릿의 `이름`을 입력해주세요.")],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
     const removed = removeExtraBookmarklet(interaction.user.id, label);
     if (!removed) {
       await interaction.reply({
