@@ -7,6 +7,14 @@ export interface BookmarkletPreset {
   label: string;
   description: string;
   code: string;
+  execution?: BookmarkletExecution;
+}
+
+interface BookmarkletExecution {
+  popupUrl?: string;
+  popupName?: string;
+  completionTopic?: string;
+  timeoutMs?: number;
 }
 
 export const BOOKMARKLET_PRESETS: BookmarkletPreset[] = [{
@@ -14,11 +22,21 @@ export const BOOKMARKLET_PRESETS: BookmarkletPreset[] = [{
   label: "maishift",
   description: "대부분 사용자가 함께 쓰는 maishift 북마클릿",
   code: "javascript:(function(i){var t=i.createElement(\"script\");t.src=\"https://maimai.shiftpsh.com/bookmarklet.js?v=\"+Math.floor(Date.now()/1e5),i.body.append(t)})(document);",
+  execution: {
+    popupUrl: "https://maimai.shiftpsh.com/upload",
+    popupName: "maimai-record",
+    completionTopic: "complete",
+    timeoutMs: 30000,
+  },
 }];
 
-export function getBookmarkletPresets(ids: string[]): Array<{ label: string; code: string }> {
+export function getBookmarkletPresets(ids: string[]): Array<{ label: string; code: string; execution?: BookmarkletExecution }> {
   const enabled = new Set(ids);
-  return BOOKMARKLET_PRESETS.filter((preset) => enabled.has(preset.id)).map((preset) => ({ label: preset.label, code: preset.code }));
+  return BOOKMARKLET_PRESETS.filter((preset) => enabled.has(preset.id)).map((preset) => ({
+    label: preset.label,
+    code: preset.code,
+    execution: preset.execution,
+  }));
 }
 
 export function buildBookmarklet(token: string, port: number): string {
@@ -26,19 +44,14 @@ export function buildBookmarklet(token: string, port: number): string {
   return `javascript:(function(d){var s=d.createElement('script');s.src='${server}/bookmarklet.js?code=${token}&v='+Math.floor(Date.now()/1e5);d.body.append(s)})(document)`;
 }
 
-export function buildBookmarkletJs(extras: Array<{ label: string; code: string }>): string {
+export function buildBookmarkletJs(extras: Array<{ label: string; code: string; execution?: BookmarkletExecution }>): string {
   if (extras.length === 0) return bookmarkletJs;
   const extrasJson = JSON.stringify(extras);
-  const opensShiftWindow = extras.some((bookmarklet) => bookmarklet.code.includes("maimai.shiftpsh.com/bookmarklet.js"));
-  const shiftWindowPrelude = opensShiftWindow
-    ? `var _carolShiftWin=null;try{_carolShiftWin=window.open('https://maimai.shiftpsh.com/upload','maimai-record');}catch(_shiftOpen){}`
-    : "";
-  const injection = `setTimeout(function(){var _exbms=${extrasJson};if(_exbms.length>0){addSection('EXTRA');_exbms.forEach(function(bm,i){var _id='ex'+i;var _lbl=bm.label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');addRow(_id,_lbl);function _fail(tx){setRow(_id,'\\u2715','#f87171',tx||'실패');}function _ok(tx){okRow(_id,tx||'완료');}try{var _done=false,_seen=false,_isShift=bm.code.indexOf('maimai.shiftpsh.com/bookmarklet.js')>=0;function _timeout(){if(!_done){_done=true;(_seen?_fail('응답 없음'):_fail('실행 오류'));}}var _timer=setTimeout(_timeout,30000);function _bump(){clearTimeout(_timer);_timer=setTimeout(_timeout,30000);}function _finish(fn,tx){if(_done)return;_done=true;clearTimeout(_timer);if(_isShift&&_wo)window.open=_wo;fn(tx);}function _watch(n){_seen=true;if(n&&n.tagName&&n.tagName.toLowerCase()==='script'){n.addEventListener('load',function(){if(_isShift){setRow(_id,'\\u21bb','#facc15','실행 중');}else{_finish(_ok,'로드됨');}},{once:true});n.addEventListener('error',function(){_finish(_fail,'로드 실패');},{once:true});}}var _ac=doc.body.appendChild,_ap=doc.body.append,_wo=window.open;doc.body.appendChild=function(n){_watch(n);return _ac.call(this,n);};doc.body.append=function(){for(var _ai=0;_ai<arguments.length;_ai++)_watch(arguments[_ai]);return _ap.apply(this,arguments);};if(_isShift){window.open=function(url,name,features){if(String(url).indexOf('https://maimai.shiftpsh.com/upload')===0&&name==='maimai-record'){if(!_carolShiftWin||_carolShiftWin.closed){_finish(_fail,'팝업 차단');return null;}return{postMessage:function(msg,origin){if(!_done){if(msg&&msg.topic==='complete'){_finish(_ok,'완료');}else{_bump();setRow(_id,'\\u21bb','#facc15','실행 중');}}return _carolShiftWin.postMessage(msg,origin);}};}return _wo.apply(this,arguments);};}try{var _c=bm.code.replace(/^javascript:/,'');(0,eval)(_c);if(!_seen&&!_isShift)_finish(_ok,'완료');}finally{doc.body.appendChild=_ac;doc.body.append=_ap;if(!_isShift)window.open=_wo;}}catch(_e){console.warn('[carol] extra:',bm.label,_e);_fail('실패');}});}},0);`;
+  const injection = `setTimeout(function(){var _exbms=${extrasJson};if(_exbms.length>0){addSection('EXTRA');_exbms.forEach(function(bm,i){var _id='ex'+i;var _lbl=bm.label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');addRow(_id,_lbl);function _fail(tx){setRow(_id,'\\u2715','#f87171',tx||'실패');}function _ok(tx){okRow(_id,tx||'완료');}try{var _done=false,_seen=false,_exec=bm.execution||{},_timeoutMs=_exec.timeoutMs||12000;function _timeout(){if(!_done){_done=true;(_seen?_fail('응답 없음'):_fail('실행 오류'));}}var _timer=setTimeout(_timeout,_timeoutMs);function _bump(){clearTimeout(_timer);_timer=setTimeout(_timeout,_timeoutMs);}function _restore(){doc.body.appendChild=_ac;doc.body.append=_ap;window.open=_wo;}function _finish(fn,tx){if(_done)return;_done=true;clearTimeout(_timer);_restore();fn(tx);}function _watch(n){_seen=true;if(n&&n.tagName&&n.tagName.toLowerCase()==='script'){n.addEventListener('load',function(){if(_exec.completionTopic){setRow(_id,'\\u21bb','#facc15','실행 중');}else{_finish(_ok,'로드됨');}},{once:true});n.addEventListener('error',function(){_finish(_fail,'로드 실패');},{once:true});}}var _ac=doc.body.appendChild,_ap=doc.body.append,_wo=window.open;doc.body.appendChild=function(n){_watch(n);return _ac.call(this,n);};doc.body.append=function(){for(var _ai=0;_ai<arguments.length;_ai++)_watch(arguments[_ai]);return _ap.apply(this,arguments);};if(_exec.popupUrl){window.open=function(url,name,features){var _opened=_wo.apply(this,arguments);if(String(url).indexOf(_exec.popupUrl)===0&&(!_exec.popupName||name===_exec.popupName)){if(!_opened||_opened.closed){_finish(_fail,'팝업 차단');return _opened;}return{postMessage:function(msg,origin){if(!_done){if(_exec.completionTopic&&msg&&msg.topic===_exec.completionTopic){_finish(_ok,'완료');}else{_bump();setRow(_id,'\\u21bb','#facc15','실행 중');}}return _opened.postMessage(msg,origin);}};}return _opened;};}try{var _c=bm.code.replace(/^javascript:/,'');(0,eval)(_c);if(!_seen&&!_exec.completionTopic)_finish(_ok,'완료');}finally{if(!_exec.completionTopic)_restore();}}catch(_e){console.warn('[carol] extra:',bm.label,_e);_fail('실패');}});}},0);`;
   const marker = "})()";
-  const source = opensShiftWindow ? bookmarkletJs.replace("var old=doc.getElementById('mm-sync-ov');", `${shiftWindowPrelude}var old=doc.getElementById('mm-sync-ov');`) : bookmarkletJs;
-  const pos = source.lastIndexOf(marker);
+  const pos = bookmarkletJs.lastIndexOf(marker);
   if (pos === -1) return bookmarkletJs;
-  return source.slice(0, pos) + injection + source.slice(pos);
+  return bookmarkletJs.slice(0, pos) + injection + bookmarkletJs.slice(pos);
 }
 
 export const bookmarkletJs = `(async()=>{
