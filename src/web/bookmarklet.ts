@@ -2,6 +2,25 @@ let baseUrl = "";
 export function setBaseUrl(url: string): void { baseUrl = url; }
 export function getBaseUrl(port: number): string { return baseUrl || `http://localhost:${port}`; }
 
+export interface BookmarkletPreset {
+  id: string;
+  label: string;
+  description: string;
+  code: string;
+}
+
+export const BOOKMARKLET_PRESETS: BookmarkletPreset[] = [{
+  id: "maishift",
+  label: "maishift",
+  description: "대부분 사용자가 함께 쓰는 maishift 북마클릿",
+  code: "javascript:(function(i){var t=i.createElement(\"script\");t.src=\"https://maimai.shiftpsh.com/bookmarklet.js?v=\"+Math.floor(Date.now()/1e5),i.body.append(t)})(document);",
+}];
+
+export function getBookmarkletPresets(ids: string[]): Array<{ label: string; code: string }> {
+  const enabled = new Set(ids);
+  return BOOKMARKLET_PRESETS.filter((preset) => enabled.has(preset.id)).map((preset) => ({ label: preset.label, code: preset.code }));
+}
+
 export function buildBookmarklet(token: string, port: number): string {
   const server = getBaseUrl(port);
   return `javascript:(function(d){var s=d.createElement('script');s.src='${server}/bookmarklet.js?code=${token}&v='+Math.floor(Date.now()/1e5);d.body.append(s)})(document)`;

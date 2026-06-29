@@ -89,8 +89,9 @@ try { db.exec("ALTER TABLE profiles ADD COLUMN clear_json TEXT DEFAULT '[]'"); }
 try { db.exec("ALTER TABLE profiles ADD COLUMN rating_card_blob BLOB DEFAULT NULL"); } catch (_) {}
 try { db.exec("ALTER TABLE profiles ADD COLUMN rating_card_synced_at INTEGER DEFAULT 0"); } catch (_) {}
 try { db.exec("ALTER TABLE profiles ADD COLUMN rating_card_version INTEGER DEFAULT 0"); } catch (_) {}
-try { db.exec("ALTER TABLE sessions ADD COLUMN profile_private INTEGER DEFAULT 1"); } catch (_) {}
+try { db.exec("ALTER TABLE sessions ADD COLUMN profile_private INTEGER DEFAULT 0"); } catch (_) {}
 try { db.exec("ALTER TABLE sessions ADD COLUMN extra_bookmarklets TEXT DEFAULT '[]'"); } catch (_) {}
+try { db.exec("ALTER TABLE sessions ADD COLUMN preset_bookmarklets TEXT DEFAULT '[]'"); } catch (_) {}
 
 // ─── Queries ────────────────────────────────────────────────────────────
 const stmtGet = db.prepare("SELECT friend_code AS friendCode, player_name AS playerName, rating, rating_max AS ratingMax, trophy, trophy_class AS trophyClass, avatar, grade_img AS gradeImg, stars, comment, play_count AS playCount, raw_html AS rawHtml, recent_json AS recentJson, top_json AS topJson, clear_json AS clearJson, last_synced_at AS lastSyncedAt FROM profiles WHERE friend_code = ?");
@@ -180,8 +181,8 @@ export function saveUserSession(discordUserId: string, cookieJson: string, frien
   console.log(`[db] 세션 저장: user=${discordUserId.slice(-6)}, fc=${friendCode || "(없음)"}`);
   const encrypted = encrypt(cookieJson);
   db.prepare(`
-    INSERT INTO sessions (discord_user_id, cookie_json, friend_code, updated_at)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO sessions (discord_user_id, cookie_json, friend_code, profile_private, updated_at)
+    VALUES (?, ?, ?, 0, ?)
     ON CONFLICT(discord_user_id) DO UPDATE SET
       cookie_json = excluded.cookie_json,
       friend_code = COALESCE(NULLIF(excluded.friend_code, ''), sessions.friend_code),
@@ -215,8 +216,8 @@ export function getUserSyncToken(discordUserId: string): string {
   if (row?.sync_token) return row.sync_token;
   const token = crypto.randomBytes(12).toString("hex");
   db.prepare(`
-    INSERT INTO sessions (discord_user_id, cookie_json, sync_token, updated_at)
-    VALUES (?, '{}', ?, ?)
+    INSERT INTO sessions (discord_user_id, cookie_json, sync_token, profile_private, updated_at)
+    VALUES (?, '{}', ?, 0, ?)
     ON CONFLICT(discord_user_id) DO UPDATE SET sync_token = excluded.sync_token
   `).run(discordUserId, token, Date.now());
   return token;
@@ -268,16 +269,35 @@ export function setGuildSetting(guildId: string, autoRole: boolean): void {
   db.prepare("INSERT OR REPLACE INTO guild_settings (guild_id, auto_role) VALUES (?, ?)").run(guildId, autoRole ? 1 : 0);
 }
 
-// ─── Per-user profile privacy (기본 비공개) ──────────────────────────────
+// ─── Per-user profile privacy (기본 공개) ────────────────────────────────
 export function getProfilePrivate(discordUserId: string): boolean {
   const row = db.prepare("SELECT profile_private FROM sessions WHERE discord_user_id = ?").get(discordUserId) as { profile_private: number | null } | undefined;
-  // 세션이 없거나 값이 없으면 비공개로 간주
-  return row ? row.profile_private !== 0 : true;
+  return row?.profile_private === 1;
 }
 
 // 세션(프로필)이 등록된 유저만 설정 가능. 변경된 행 수를 반환.
 export function setProfilePrivate(discordUserId: string, isPrivate: boolean): number {
   const info = db.prepare("UPDATE sessions SET profile_private = ? WHERE discord_user_id = ?").run(isPrivate ? 1 : 0, discordUserId);
+  return info.changes;
+}
+
+export function getEnabledBookmarkletPresetIds(discordUserId: string): string[] {
+  const row = db.prepare("SELECT preset_bookmarklets FROM sessions WHERE discord_user_id = ?").get(discordUserId) as { preset_bookmarklets: string | null } | undefined;
+  if (!row?.preset_bookmarklets) return [];
+  try {
+    const parsed = JSON.parse(row.preset_bookmarklets);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setBookmarkletPresetEnabled(discordUserId: string, presetId: string, enabled: boolean): number {
+  const existing = getEnabledBookmarkletPresetIds(discordUserId);
+  const next = enabled
+    ? Array.from(new Set([...existing, presetId]))
+    : existing.filter((id) => id !== presetId);
+  const info = db.prepare("UPDATE sessions SET preset_bookmarklets = ? WHERE discord_user_id = ?").run(JSON.stringify(next), discordUserId);
   return info.changes;
 }
 
@@ -320,8 +340,8 @@ export function addExtraBookmarklet(discordUserId: string, label: string, code: 
   filtered.push({ label, code });
   const json = JSON.stringify(filtered);
   db.prepare(`
-    INSERT INTO sessions (discord_user_id, cookie_json, extra_bookmarklets, updated_at)
-    VALUES (?, '{}', ?, ?)
+    INSERT INTO sessions (discord_user_id, cookie_json, extra_bookmarklets, profile_private, updated_at)
+    VALUES (?, '{}', ?, 0, ?)
     ON CONFLICT(discord_user_id) DO UPDATE SET extra_bookmarklets = excluded.extra_bookmarklets
   `).run(discordUserId, json, Date.now());
 }

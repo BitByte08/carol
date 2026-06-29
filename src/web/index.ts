@@ -1,8 +1,8 @@
 import * as http from "http";
 import * as fs from "fs";
 import { parseHome, parsePlayerData, parseFriendCode as parseFC, parseRecentRecords, parseTop5, parseTopSongs, parseMusicScore, mergeTopRecords } from "../scraper";
-import { cacheProfile, getCachedProfile, saveUserSession, getUserSyncToken, findUserBySyncToken, saveAvatarBlob, getAvatarBlob, getSongJacket, saveSongJacket, getExtraBookmarklets, getProfilePrivate, setProfilePrivate, addExtraBookmarklet, removeExtraBookmarklet } from "../db";
-import { buildBookmarkletJs, setBaseUrl, getBaseUrl, buildBookmarklet } from "./bookmarklet";
+import { cacheProfile, getCachedProfile, saveUserSession, getUserSyncToken, findUserBySyncToken, saveAvatarBlob, getAvatarBlob, getSongJacket, saveSongJacket, getExtraBookmarklets, getProfilePrivate, setProfilePrivate, addExtraBookmarklet, removeExtraBookmarklet, getEnabledBookmarkletPresetIds, setBookmarkletPresetEnabled } from "../db";
+import { buildBookmarkletJs, setBaseUrl, getBaseUrl, buildBookmarklet, BOOKMARKLET_PRESETS, getBookmarkletPresets } from "./bookmarklet";
 import { settingsPage } from "./settingsPage";
 import { CONFIG } from "../config";
 
@@ -180,7 +180,9 @@ export function startWebServer(port: number): void {
       const code = url.searchParams.get("code") ?? "";
       const userId = code ? findUserBySyncToken(code) : null;
       const extras = userId ? getExtraBookmarklets(userId) : [];
-      res.end(buildBookmarkletJs(extras));
+      const presetIds = userId ? getEnabledBookmarkletPresetIds(userId) : [];
+      const bookmarklets = [...getBookmarkletPresets(presetIds), ...extras];
+      res.end(buildBookmarkletJs(bookmarklets));
       return;
     }
 
@@ -256,9 +258,10 @@ a{color:#c084fc}
       const userId = findUserBySyncToken(token);
       if (!userId && !isDev) { res.writeHead(403); res.end("expired"); return; }
       const isPrivate = userId ? getProfilePrivate(userId) : false;
+      const presetIds = userId ? getEnabledBookmarkletPresetIds(userId) : [];
       const bookmarklets = userId ? getExtraBookmarklets(userId) : [];
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(settingsPage(token, isPrivate, bookmarklets));
+      res.end(settingsPage(token, isPrivate, presetIds, bookmarklets));
       return;
     }
 
@@ -268,9 +271,10 @@ a{color:#c084fc}
       const userId = findUserBySyncToken(token);
       if (!userId) { res.writeHead(403, { "content-type": "application/json" }); res.end(JSON.stringify({ error: "expired" })); return; }
       const isPrivate = getProfilePrivate(userId);
+      const presets = getEnabledBookmarkletPresetIds(userId);
       const bookmarklets = getExtraBookmarklets(userId);
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ private: isPrivate, bookmarklets }));
+      res.end(JSON.stringify({ private: isPrivate, presets, bookmarklets }));
       return;
     }
 
@@ -284,6 +288,30 @@ a{color:#c084fc}
         setProfilePrivate(userId, value);
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ private: value }));
+      } catch {
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "invalid_body" }));
+      }
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/settings/preset") {
+      const token = url.searchParams.get("code") || "";
+      const userId = findUserBySyncToken(token);
+      if (!userId) { res.writeHead(403, { "content-type": "application/json" }); res.end(JSON.stringify({ error: "expired" })); return; }
+      try {
+        const body = JSON.parse(await readBody(req));
+        const presetId = (body.presetId || "").trim();
+        if (!BOOKMARKLET_PRESETS.some((preset) => preset.id === presetId)) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "invalid_preset" }));
+          return;
+        }
+        const enabled = !!body.enabled;
+        setBookmarkletPresetEnabled(userId, presetId, enabled);
+        const presets = getEnabledBookmarkletPresetIds(userId);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ presets }));
       } catch {
         res.writeHead(400, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: "invalid_body" }));
