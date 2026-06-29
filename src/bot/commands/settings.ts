@@ -11,14 +11,22 @@ export const data = new SlashCommandBuilder()
   .setDescription("웹 설정 페이지 안내");
 
 function buildSettingsContent(userId: string) {
-  const settingsUrl = `${getBaseUrl(PORT)}/settings?code=${getUserSyncToken(userId)}`;
+  const baseUrl = getBaseUrl(PORT);
+  const settingsUrl = `${baseUrl}/settings?code=${getUserSyncToken(userId)}`;
+  const termsUrl = `${baseUrl}/terms`;
   const embed = new EmbedBuilder()
     .setTitle("⚙️ 웹 설정")
     .setColor(0x5865f2)
-    .addFields({
-      name: "설정 페이지에서 관리",
-      value: "프로필 공개 여부, 프리셋 북마클릿, 추가 북마클릿을 웹에서 관리할 수 있습니다.",
-    });
+    .addFields(
+      {
+        name: "설정 페이지에서 관리",
+        value: "프로필 공개 여부, 프리셋 북마클릿, 추가 북마클릿을 웹에서 관리할 수 있습니다.",
+      },
+      {
+        name: "이용약관",
+        value: "추가 북마클릿 사용 책임과 면책 조항은 이용약관에서 확인할 수 있습니다.",
+      },
+    );
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
@@ -26,6 +34,11 @@ function buildSettingsContent(userId: string) {
       .setStyle(ButtonStyle.Link)
       .setURL(settingsUrl)
       .setEmoji("⚙️"),
+    new ButtonBuilder()
+      .setLabel("이용약관")
+      .setStyle(ButtonStyle.Link)
+      .setURL(termsUrl)
+      .setEmoji("📄"),
   );
 
   return { embeds: [embed], components: [row] };
