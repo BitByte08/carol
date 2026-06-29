@@ -1,7 +1,9 @@
 import type { ExtraBookmarklet } from "../db";
+import { BOOKMARKLET_PRESETS } from "./bookmarklet";
 
-export function settingsPage(token: string, isPrivate: boolean, bookmarklets: ExtraBookmarklet[]): string {
-  const dataJson = JSON.stringify({ private: isPrivate, bookmarklets })
+export function settingsPage(token: string, isPrivate: boolean, enabledPresetIds: string[], bookmarklets: ExtraBookmarklet[]): string {
+  const presets = BOOKMARKLET_PRESETS.map((preset) => ({ ...preset, enabled: enabledPresetIds.includes(preset.id) }));
+  const dataJson = JSON.stringify({ private: isPrivate, presets, bookmarklets })
     .replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
   const tokenJson = JSON.stringify(token);
 
@@ -72,6 +74,11 @@ a{color:#c084fc}
 <div class="status" id="privStatus"></div>
 </div>
 <div class="card">
+<p class="section-label">프리셋 북마클릿 <span class="count" id="presetCount"></span></p>
+<ul class="bm-list" id="presetList"></ul>
+<div class="status" id="presetStatus"></div>
+</div>
+<div class="card">
 <p class="section-label">추가 북마클릿 <span class="count" id="bmCount"></span></p>
 <ul class="bm-list" id="bmList"></ul>
 <div class="add-form" id="addForm">
@@ -89,6 +96,7 @@ var MAX_BM=5;
 
 (function init(){
   renderPrivacy();
+  renderPresetList();
   renderBmList();
 })();
 
@@ -137,6 +145,36 @@ function togglePrivacy(){
     showStatus('privStatus','ok','\uC800\uC7A5\uB428');
   })
   .catch(function(){cb.checked=!cb.checked;showStatus('privStatus','err','\uC800\uC7A5 \uC2E4\uD328');});
+}
+
+function renderPresetList(){
+  var list=document.getElementById('presetList');
+  var countEl=document.getElementById('presetCount');
+  var enabled=DATA.presets.filter(function(p){return p.enabled;}).length;
+  countEl.textContent=enabled+'/'+DATA.presets.length;
+  if(DATA.presets.length===0){list.innerHTML='<li class="empty">사용 가능한 프리셋이 없습니다.</li>';return;}
+  var html='';
+  DATA.presets.forEach(function(p){
+    var code=esc(p.code.length>70?p.code.substring(0,70)+'...':p.code);
+    html+='<li class="bm-item"><div class="bm-item-info"><div class="bm-label">'+esc(p.label)+'</div><div class="toggle-desc">'+esc(p.description)+'</div><div class="bm-code-preview">'+code+'</div></div><label class="toggle"><input type="checkbox" data-preset="'+esc(p.id)+'" '+(p.enabled?'checked':'')+'><span class="slider"></span></label></li>';
+  });
+  list.innerHTML=html;
+  list.querySelectorAll('input[data-preset]').forEach(function(input){
+    input.onchange=function(){togglePreset(this.getAttribute('data-preset'),this);};
+  });
+}
+
+function togglePreset(id,cb){
+  var enabled=cb.checked;
+  fetch('/api/settings/preset?code='+TOKEN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({presetId:id,enabled:enabled})})
+  .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+  .then(function(){
+    var preset=DATA.presets.find(function(p){return p.id===id;});
+    if(preset)preset.enabled=enabled;
+    renderPresetList();
+    showStatus('presetStatus','ok','저장됨');
+  })
+  .catch(function(){cb.checked=!cb.checked;showStatus('presetStatus','err','저장 실패');});
 }
 
 function addBm(){
