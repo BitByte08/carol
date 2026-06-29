@@ -69,10 +69,6 @@ client.on(Events.InteractionCreate, async (i) => {
     return;
   }
   if (i.isButton()) {
-    if (i.customId.startsWith("psettings:")) {
-      try { await settings.handleButton(i); } catch (e) { console.error("[settings-btn]", e); }
-      return;
-    }
     if (i.customId.startsWith("serverset:")) {
       try { await serverSettings.handleButton(i); } catch (e) { console.error("[serverset-btn]", e); }
       return;
