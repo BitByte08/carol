@@ -52,13 +52,15 @@ src/web/
 - `settingsPage()` serializes data with `<`/`>` escaped before embedding in `<script>`.
 - Extra bookmarklets must start with `javascript:` and are capped at 5.
 - Preset bookmarklets execute before user extra bookmarklets in generated `/bookmarklet.js`.
+- Preset/extra bookmarklet tracking must not override `window.open`; popup bookmarklets such as `maishift` must receive native browser behavior.
 - Bookmarklet execution is restricted to `maimaidx.jp` and `maimaidx-eng.com` before DOM work.
 
 ## SYNC GOTCHAS
 
 - `/sync` writes `debug_home.html`, `debug_pd.html`, `debug_fc.html`, `debug_record.html`, `debug_rating_target.html` in repo root.
-- `no_change` skips parse/render/DB writes only when cached `clearJson` is non-empty and play count is unchanged.
-- Empty `clearJson` bypasses `no_change` so broken cached clear data can be repaired without play-count changes.
+- The old play-count-only `no_change` shortcut was removed; `/sync` should parse/cache posted data even when play count is unchanged.
+- `/sync` rejects invalid payloads before caching when profile/friend code/clear/rating-target data is missing or recent-play parsing returns fewer rows than expected.
+- Recent-play storage is intentionally capped to the latest 5 games, not 5 songs; duplicate same-song plays must remain separate records.
 - `POST /sync` stores recent records, rating target records, clear records, avatar, song jackets, and session friend code.
 - DX NET HTML selectors live in `src/scraper.ts`; check debug files first when SEGA layout changes.
 
