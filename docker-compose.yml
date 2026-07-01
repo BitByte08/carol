@@ -1,6 +1,6 @@
 services:
   bot:
-    image: ghcr.io/bitbyte08/carol:latest
+    image: ghcr.io/team-carol/carol:latest
     container_name: carol-bot
     restart: unless-stopped
     volumes:
