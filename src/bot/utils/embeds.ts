@@ -167,11 +167,11 @@ export function groupByGame(records: PlayRecord[]): PlayRecord[][] {
   const games: PlayRecord[][] = [];
   let current: PlayRecord[] = [];
   for (const r of records) {
+    current.push(r);
     if (r.track <= 1 && current.length > 0) {
       games.push(current);
       current = [];
     }
-    current.push(r);
   }
   if (current.length > 0) games.push(current);
   for (const game of games) game.sort((a, b) => b.track - a.track);

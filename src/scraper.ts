@@ -124,13 +124,11 @@ export function parseRecentRecords(html: string): PlayRecord[] {
   const recent: PlayRecord[] = [];
   let games = 0;
   for (const r of records) {
-    if (r.track <= 1) {
-      if (games >= 5) break;
-      games++;
-    } else if (games === 0) {
-      games = 1;
-    }
     recent.push(r);
+    if (r.track <= 1) {
+      games++;
+      if (games >= 5) break;
+    }
   }
   return recent;
 }

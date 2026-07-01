@@ -48,10 +48,10 @@ export function buildBookmarkletJs(extras: Array<{ label: string; code: string; 
   if (extras.length === 0) return bookmarkletJs;
   const extrasJson = JSON.stringify(extras);
   const injection = `(function(){var _exbms=${extrasJson};if(_exbms.length>0){addSection('EXTRA');_exbms.forEach(function(bm,i){var _id='ex'+i;var _lbl=bm.label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');addRow(_id,_lbl);try{(0,eval)(bm.code.replace(/^javascript:/,''));okRow(_id,'\\uC2E4\\uD589');}catch(_e){console.warn('[carol] extra:',bm.label,_e);failRow(_id,'\\uC2E4\\uD328');}});}})();`;
-  const marker = "var coreOk=await collectCore();";
+  const marker = "addSection('PROFILE');";
   const pos = bookmarkletJs.indexOf(marker);
   if (pos === -1) return bookmarkletJs;
-  return bookmarkletJs.slice(0, pos) + injection + marker + bookmarkletJs.slice(pos + marker.length);
+  return bookmarkletJs.slice(0, pos) + injection + bookmarkletJs.slice(pos);
 }
 
 export const bookmarkletJs = `(async()=>{
