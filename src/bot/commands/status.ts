@@ -5,6 +5,19 @@ export const data = new SlashCommandBuilder()
   .setName("상태")
   .setDescription("봇 및 서버 상태 확인");
 
+function envText(name: string): string | null {
+  const value = process.env[name]?.trim();
+  return value ? value : null;
+}
+
+function displayVersion(): string {
+  const buildVersion = envText("BUILD_VERSION");
+  const releaseVersion = envText("RELEASE_VERSION");
+
+  if (buildVersion && releaseVersion) return `${releaseVersion} (${buildVersion})`;
+  return buildVersion ?? releaseVersion ?? "local";
+}
+
 function formatUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -23,6 +36,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const uptime = formatUptime(Math.floor(process.uptime()));
   const userCount = getRegisteredUserCount();
   const lastSync = getLastSyncTime();
+  const version = displayVersion();
   const lastSyncStr = lastSync
     ? new Date(lastSync).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })
     : "없음";
@@ -35,6 +49,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         .addFields(
           { name: "핑", value: `${ping}ms`, inline: true },
           { name: "가동 시간", value: uptime, inline: true },
+          { name: "버전", value: version, inline: true },
           { name: "등록 유저", value: `${userCount}명`, inline: true },
           { name: "마지막 동기화", value: lastSyncStr, inline: false },
         ),

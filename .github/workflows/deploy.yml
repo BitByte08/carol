@@ -21,6 +21,13 @@ jobs:
       - name: Lowercase image name (GHCR requires lowercase)
         run: echo "IMAGE_LC=${{ env.REGISTRY }}/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/${{ env.IMAGE_BASE }}:latest" >> $GITHUB_ENV
 
+      - name: Set build metadata
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          release_version="$(node -p "require('./package.json').version")"
+          echo "BUILD_VERSION=build-${GITHUB_RUN_NUMBER}-${short_sha}" >> "$GITHUB_ENV"
+          echo "RELEASE_VERSION=${release_version}" >> "$GITHUB_ENV"
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -37,6 +44,9 @@ jobs:
           context: .
           push: true
           tags: ${{ env.IMAGE_LC }}
+          build-args: |
+            BUILD_VERSION=${{ env.BUILD_VERSION }}
+            RELEASE_VERSION=${{ env.RELEASE_VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

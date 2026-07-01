@@ -10,6 +10,8 @@ RUN npx tsc
 
 # Stage 2: Production
 FROM node:20-slim
+ARG BUILD_VERSION=local
+ARG RELEASE_VERSION=0.0.0
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -18,4 +20,6 @@ COPY --from=build /app/dist/ ./dist/
 VOLUME ["/app/data"]
 ENV NODE_ENV=production
 ENV DATA_DIR=/app/data
+ENV BUILD_VERSION=${BUILD_VERSION}
+ENV RELEASE_VERSION=${RELEASE_VERSION}
 CMD ["node", "dist/bot/index.js"]
