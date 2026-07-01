@@ -216,6 +216,11 @@ export async function recentEmbeds(
         .setColor(0x2b2d31)
         .setTitle(truncateVisual(r.title, 26) + kind)
         .setDescription(desc)
+        .setAuthor(
+          r.track > 0
+            ? { name: `Track ${String(r.track).padStart(2, "0")}` }
+            : null,
+        )
         .addFields(
           { name: "달성률", value: r.achievement, inline: true },
           { name: "플레이일", value: r.date || "-", inline: true },
@@ -232,7 +237,7 @@ export async function recentEmbeds(
 
   const prevBtn = new ButtonBuilder()
     .setCustomId(`page:${userId}:${idx - 1}`)
-    .setLabel("◀ 이전 게임")
+    .setLabel("◀ 이전")
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(idx === 0);
   const countBtn = new ButtonBuilder()
@@ -242,7 +247,7 @@ export async function recentEmbeds(
     .setDisabled(true);
   const nextBtn = new ButtonBuilder()
     .setCustomId(`page:${userId}:${idx + 1}`)
-    .setLabel("다음 게임 ▶")
+    .setLabel("다음 ▶")
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(idx === total - 1);
 
@@ -363,7 +368,9 @@ export async function searchResultEmbeds(
         .setColor(0x2b2d31)
         .setTitle(truncateVisual(title, 26) + kind)
         .setDescription(
-          "```\n" + lines.join("\n") + "\n```" + `\n[▶ 외부출력](${ytUrl})`,
+          `\`${query}\` 에 대한 검색 결과\n\n` +
+            "```\n" + lines.join("\n") + "\n```" +
+            `\n[▶ 외부출력](${ytUrl})`,
         );
       if (buf) {
         const name = `sjacket${i}.png`;
