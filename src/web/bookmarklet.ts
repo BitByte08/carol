@@ -48,7 +48,7 @@ export function buildBookmarkletJs(extras: Array<{ label: string; code: string; 
   if (extras.length === 0) return bookmarkletJs;
   const extrasJson = JSON.stringify(extras);
   const baseJs = bookmarkletJs.replace(/setTimeout\(function\(\)\{ov\.style\.transition='opacity \.3s';ov\.style\.opacity='0';setTimeout\(function\(\)\{ov\.remove\(\);\},300\);\},2500\);/g, "");
-  const injection = `(function(){var _exbms=${extrasJson};if(_exbms.length>0){addSection('EXTRA');_exbms.forEach(function(bm,i){var _id='ex'+i;var _lbl=bm.label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');addRow(_id,_lbl);try{if(bm.execution&&bm.execution.popupUrl){window.open(bm.execution.popupUrl,bm.execution.popupName||'');okRow(_id,'\\uC2E4\\uD589');}else{(0,eval)(bm.code.replace(/^javascript:/,''));okRow(_id,'\\uC2E4\\uD589');}}catch(_e){console.warn('[carol] extra:',bm.label,_e);failRow(_id,'\\uC2E4\\uD328');}});}})();`;
+  const injection = `(function(){var _exbms=${extrasJson};_exbms.forEach(function(bm){try{(0,eval)(bm.code.replace(/^javascript:/,''));}catch(_e){console.warn('[carol] extra:',bm.label,_e);}});})();`;
   const marker = "})()";
   const pos = baseJs.lastIndexOf(marker);
   if (pos === -1) return baseJs;
