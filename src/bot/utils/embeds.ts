@@ -275,6 +275,7 @@ export async function searchResultEmbeds(
   userId: string,
   query: string,
   pageIdx: number,
+  typeFilter = "",
 ): Promise<{
   embeds: EmbedBuilder[];
   components: ActionRowBuilder<ButtonBuilder>[];
@@ -285,6 +286,8 @@ export async function searchResultEmbeds(
   // 같은 곡명이라도 ST/DX 채보는 별도 결과로 분리 (musicKind 포함 키로 그룹핑)
   const byChart = new Map<string, PlayRecord[]>();
   for (const r of records) {
+    // ST/DX 타입 필터 (선택 시 해당 타입만)
+    if (typeFilter && (r.musicKind || "") !== typeFilter) continue;
     // 곡명 또는 별명(NeonDB)에 부분 일치
     if (!normalizeQuery(r.title).includes(q) && !aliasMatches(r.title, q))
       continue;
@@ -306,12 +309,14 @@ export async function searchResultEmbeds(
     })
     .map(([k]) => k);
 
+  const typeLabel = typeFilter ? ` [${typeFilter}]` : "";
+
   if (keys.length === 0) {
     return {
       embeds: [
         new EmbedBuilder()
           .setColor(0x2b2d31)
-          .setDescription(`"${query}" 검색 결과 없음`),
+          .setDescription(`"${query}"${typeLabel} 검색 결과 없음`),
       ],
       components: [],
       files: [],
@@ -368,7 +373,7 @@ export async function searchResultEmbeds(
       const emb = new EmbedBuilder()
         .setColor(0x2b2d31)
         .setTitle(truncateVisual(title, 26) + kind)
-        .setAuthor({ name: `"${query}" 에 대한 검색 결과` })
+        .setAuthor({ name: `"${query}"${typeLabel} 에 대한 검색 결과` })
         .setDescription(
           "```\n" + lines.join("\n") + "\n```" + `\n[▶ 외부출력](${ytUrl})`,
         );
@@ -383,7 +388,7 @@ export async function searchResultEmbeds(
 
   const qEnc = encodeURIComponent(query);
   const prevBtn = new ButtonBuilder()
-    .setCustomId(`search:${userId}:${qEnc}:${idx - 1}`)
+    .setCustomId(`search:${userId}:${qEnc}:${idx - 1}:${typeFilter}`)
     .setLabel("◀ 이전")
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(idx === 0);
@@ -393,7 +398,7 @@ export async function searchResultEmbeds(
     .setStyle(ButtonStyle.Primary)
     .setDisabled(true);
   const nextBtn = new ButtonBuilder()
-    .setCustomId(`search:${userId}:${qEnc}:${idx + 1}`)
+    .setCustomId(`search:${userId}:${qEnc}:${idx + 1}:${typeFilter}`)
     .setLabel("다음 ▶")
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(idx === totalPages - 1);

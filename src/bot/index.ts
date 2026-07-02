@@ -134,11 +134,12 @@ client.on(Events.InteractionCreate, async (i) => {
         const userId = parts[1];
         const query = decodeURIComponent(parts[2] ?? "");
         const pageIdx = parseInt(parts[3] ?? "0") || 0;
+        const typeFilter = parts[4] ?? "";
         const stored = loadUserSession(userId);
         if (!stored?.friendCode) { await (i as ButtonInteraction).reply({ content: "프로필을 먼저 등록하세요.", ephemeral: true }); return; }
         const cached = getCachedProfile(stored.friendCode);
         if (!cached) { await (i as ButtonInteraction).reply({ content: "프로필을 먼저 등록하세요.", ephemeral: true }); return; }
-        const result = await searchResultEmbeds(cached, userId, query, pageIdx);
+        const result = await searchResultEmbeds(cached, userId, query, pageIdx, typeFilter);
         await (i as ButtonInteraction).update(result);
       } catch (e) {
         console.error("[search-btn]", e);
