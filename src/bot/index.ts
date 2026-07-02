@@ -3,7 +3,7 @@ import { initEncryption } from "../crypto";
 import { startWebServer, setBaseUrl } from "../web";
 import { closeDb, loadUserSession, getCachedProfile, clearRatingCardCacheForInactive } from "../db";
 import { CONFIG, PORT } from "../config";
-import { recentEmbeds, rtTableEmbed, searchResultEmbeds } from "./utils/embeds";
+import { recentEmbeds, rtTableEmbed, searchResultEmbeds, getSearchCtx } from "./utils/embeds";
 
 import { loadConstants } from "../constants";
 import { loadAliases } from "../aliases";
@@ -131,15 +131,15 @@ client.on(Events.InteractionCreate, async (i) => {
     if (i.customId.startsWith("search:")) {
       try {
         const parts = i.customId.split(":");
-        const userId = parts[1];
-        const query = decodeURIComponent(parts[2] ?? "");
-        const pageIdx = parseInt(parts[3] ?? "0") || 0;
-        const typeFilter = parts[4] ?? "";
-        const stored = loadUserSession(userId);
+        const token = parts[1];
+        const pageIdx = parseInt(parts[2] ?? "0") || 0;
+        const ctx = getSearchCtx(token);
+        if (!ctx) { await (i as ButtonInteraction).reply({ content: "검색이 만료되었습니다. 다시 검색해주세요.", ephemeral: true }); return; }
+        const stored = loadUserSession(ctx.userId);
         if (!stored?.friendCode) { await (i as ButtonInteraction).reply({ content: "프로필을 먼저 등록하세요.", ephemeral: true }); return; }
         const cached = getCachedProfile(stored.friendCode);
         if (!cached) { await (i as ButtonInteraction).reply({ content: "프로필을 먼저 등록하세요.", ephemeral: true }); return; }
-        const result = await searchResultEmbeds(cached, userId, query, pageIdx, typeFilter);
+        const result = await searchResultEmbeds(cached, ctx.userId, ctx.query, pageIdx, ctx.typeFilter, token);
         await (i as ButtonInteraction).update(result);
       } catch (e) {
         console.error("[search-btn]", e);

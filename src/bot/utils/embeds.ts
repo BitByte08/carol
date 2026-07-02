@@ -270,12 +270,36 @@ export async function recentEmbeds(
   return { embeds, components: [navRow, shareRow], files };
 }
 
+// 검색 페이징 컨텍스트: 버튼 customId는 100자 제한이 있어 (일본어/한글 곡명은
+// encodeURIComponent 시 글자당 9자) 쿼리를 직접 담을 수 없다. 짧은 토큰만 담고
+// 실제 쿼리/필터는 메모리에 보관한다.
+export interface SearchCtx {
+  userId: string;
+  query: string;
+  typeFilter: string;
+}
+const searchCtx = new Map<string, SearchCtx>();
+const SEARCH_CTX_MAX = 1000;
+function putSearchCtx(ctx: SearchCtx): string {
+  const token = Math.random().toString(36).slice(2, 10);
+  if (searchCtx.size >= SEARCH_CTX_MAX) {
+    const oldest = searchCtx.keys().next().value;
+    if (oldest !== undefined) searchCtx.delete(oldest);
+  }
+  searchCtx.set(token, ctx);
+  return token;
+}
+export function getSearchCtx(token: string): SearchCtx | undefined {
+  return searchCtx.get(token);
+}
+
 export async function searchResultEmbeds(
   p: NonNullable<ReturnType<typeof getCachedProfile>>,
   userId: string,
   query: string,
   pageIdx: number,
   typeFilter = "",
+  token?: string,
 ): Promise<{
   embeds: EmbedBuilder[];
   components: ActionRowBuilder<ButtonBuilder>[];
@@ -386,9 +410,10 @@ export async function searchResultEmbeds(
     }),
   );
 
-  const qEnc = encodeURIComponent(query);
+  // 쿼리/필터는 토큰으로 대체 (customId 100자 제한 회피)
+  const ctxToken = token ?? putSearchCtx({ userId, query, typeFilter });
   const prevBtn = new ButtonBuilder()
-    .setCustomId(`search:${userId}:${qEnc}:${idx - 1}:${typeFilter}`)
+    .setCustomId(`search:${ctxToken}:${idx - 1}`)
     .setLabel("◀ 이전")
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(idx === 0);
@@ -398,7 +423,7 @@ export async function searchResultEmbeds(
     .setStyle(ButtonStyle.Primary)
     .setDisabled(true);
   const nextBtn = new ButtonBuilder()
-    .setCustomId(`search:${userId}:${qEnc}:${idx + 1}:${typeFilter}`)
+    .setCustomId(`search:${ctxToken}:${idx + 1}`)
     .setLabel("다음 ▶")
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(idx === totalPages - 1);
