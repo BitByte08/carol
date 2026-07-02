@@ -87,6 +87,11 @@ code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;backgrou
 </div>
 <div class="card">
 <p class="mono">Step 02</p>
+<p><a href="/settings?code=${token}">설정</a> 페이지에서 프리셋 북마클릿을 설정하세요.</p>
+<p style="font-size:13px;color:#666;margin-top:6px">캐롤봇 동기화 시 함께 실행할 외부 북마클릿(예: maishift)을 켜고 끌 수 있습니다.</p>
+</div>
+<div class="card">
+<p class="mono">Step 03</p>
 <p><a href="https://maimaidx-eng.com/maimai-mobile/" target="_blank">maimai DX net</a>에 로그인된 상태에서 저장한 북마크를 클릭하세요.</p>
 </div>
 </div>
@@ -99,6 +104,11 @@ code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;backgrou
 </div>
 <div class="card">
 <p class="mono">Step 02</p>
+<p><a href="/settings?code=${token}">설정</a> 페이지에서 프리셋 북마클릿을 설정하세요.</p>
+<p style="font-size:13px;color:#666;margin-top:6px">캐롤봇 동기화 시 함께 실행할 외부 북마클릿(예: maishift)을 켜고 끌 수 있습니다.</p>
+</div>
+<div class="card">
+<p class="mono">Step 03</p>
 <ol class="steps">
 <li class="step"><strong>빈 페이지를 북마크 저장</strong> (⭐ 또는 공유 → 북마크 추가)</li>
 <li class="step">북마크 목록을 열고, 방금 저장한 북마크를 <strong>편집</strong></li>
